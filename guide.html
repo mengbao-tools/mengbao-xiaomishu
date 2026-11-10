@@ -1,0 +1,953 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>萌宝小秘书 使用指南 v1.5.4</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --accent: #4096ff;
+    --accent-soft: #eef4ff;
+    --accent-deep: #1d6fd1;
+    --accent-line: #d6e4ff;
+    --amber: #f9a825;
+    --amber-soft: #fff8e1;
+    --sky: #0284c7;
+    --sky-soft: #e0f2fe;
+    --purple: #9333ea;
+    --purple-soft: #f3e8ff;
+    --green: #16a34a;
+    --green-soft: #e8f8ee;
+    --blue: #2563eb;
+    --blue-soft: #e8f1ff;
+    --neutral-soft: #f8fafc;
+    --danger: #dc2626;
+    --text: #1f2329;
+    --text-muted: #646a73;
+    --text-hint: #8f959e;
+    --bg: #fff;
+    --bg-secondary: #f5f7fa;
+    --border: #e5e7eb;
+    --radius: 12px;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    color: var(--text);
+    background: var(--bg-secondary);
+    line-height: 1.6;
+  }
+  /* ===== Hero ===== */
+  .hero {
+    background: linear-gradient(135deg, #4096ff 0%, #1d6fd1 100%);
+    color: #fff;
+    padding: 56px 24px 72px;
+    text-align: center;
+  }
+  .hero h1 { font-size: 32px; font-weight: 700; margin-bottom: 10px; letter-spacing: 1px; }
+  .hero .version {
+    display: inline-block;
+    background: rgba(255,255,255,0.2);
+    padding: 4px 14px;
+    border-radius: 20px;
+    font-size: 13px;
+    margin-bottom: 18px;
+  }
+  .hero .tagline { font-size: 16px; opacity: 0.92; max-width: 560px; margin: 0 auto; line-height: 1.7; }
+  /* ===== 容器 ===== */
+  .container { max-width: 880px; margin: -36px auto 60px; padding: 0 20px; }
+  /* ===== 亮点卡片 ===== */
+  .highlights { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 44px; }
+  .highlight-card {
+    background: var(--bg); border-radius: var(--radius); padding: 22px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  }
+  .highlight-card .icon-wrap {
+    width: 42px; height: 42px; border-radius: 10px; background: var(--accent-soft);
+    display: flex; align-items: center; justify-content: center; margin-bottom: 12px;
+  }
+  .highlight-card h3 { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+  .highlight-card p { font-size: 13px; color: var(--text-muted); line-height: 1.6; }
+  /* ===== 板块标题 ===== */
+  .section-title {
+    font-size: 20px; font-weight: 700; margin-bottom: 12px; padding-bottom: 10px;
+    border-bottom: 2px solid var(--accent); display: inline-block;
+  }
+  .section-intro { font-size: 13.5px; color: var(--text-muted); line-height: 1.75; margin-bottom: 20px; }
+  .feature-section { margin-bottom: 44px; }
+  /* ===== 功能板块 ===== */
+  .feature-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+  .feature-item {
+    background: var(--bg); border-radius: var(--radius); padding: 18px 20px;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.04); border-left: 3px solid var(--accent);
+  }
+  .feature-item h4 {
+    font-size: 14.5px; font-weight: 600; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;
+  }
+  .feature-item h4 .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+  .feature-item p { font-size: 13px; color: var(--text-muted); line-height: 1.65; margin-bottom: 6px; }
+  .feature-item ul { list-style: none; margin-top: 6px; }
+  .feature-item li {
+    font-size: 12.5px; color: var(--text-muted); padding: 3px 0 3px 14px; position: relative;
+  }
+  .feature-item li::before {
+    content: "·"; position: absolute; left: 4px; color: var(--text-hint); font-weight: bold;
+  }
+  /* ===== 悬浮球详解 ===== */
+  .fab-guide { background: var(--bg); border-radius: var(--radius); padding: 8px 24px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+  .fab-item { display: flex; gap: 18px; align-items: flex-start; padding: 20px 0; border-bottom: 1px solid var(--border); }
+  .fab-item:last-child { border-bottom: none; }
+  .fab-demo {
+    width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-size: 21px; flex-shrink: 0; box-shadow: 0 2px 8px rgba(0,0,0,0.12); border: 1px solid rgba(0,0,0,0.06);
+  }
+  /* 四球配色取自脚本实际值：看图 #bfdbfe、翻页 #ddd6fe、过滤 #bbf7d0、增强 #f8fafc（近白），
+     边框深浅也与脚本一致，演示球和实机上看到的是同一档颜色 */
+  .fab-demo-guolv     { background:#bbf7d0; border-color:rgba(34,197,94,0.30); color:#16a34a; }
+  .fab-demo-zengqiang { background:#f8fafc; border-color:rgba(100,116,139,0.22); color:#475569; }
+  .fab-demo-kantu     { background:#bfdbfe; border-color:rgba(59,130,246,0.30); color:#2563eb; }
+  .fab-demo-pager     { background:#ddd6fe; border-color:rgba(139,92,246,0.30); color:#8b5cf6; }
+  .fab-info { flex: 1; }
+  .fab-info h5 { font-size: 14.5px; font-weight: 600; margin-bottom: 6px; }
+  .fab-info p { font-size: 12.5px; color: var(--text-muted); line-height: 1.65; margin-bottom: 3px; }
+  .fab-where { font-size: 12px; color: var(--text-hint); margin: 6px 0 8px; }
+  .fab-where b { color: var(--text-muted); font-weight: 600; }
+  .status-row { display: flex; flex-wrap: wrap; gap: 6px; }
+  .status {
+    display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11.5px; line-height: 1.5;
+  }
+  .status-idle-amber { background: var(--amber-soft); color: #a16700; }
+  .status-on-amber   { background: var(--amber); color: #fff; }
+  .status-off-gray   { background: #e5e7eb; color: #4b5563; }
+  .status-idle-sky   { background: var(--sky-soft); color: #0369a1; }
+  .status-on-sky     { background: var(--sky); color: #fff; }
+  .status-idle-blue     { background: var(--blue-soft); color: #1e40af; }
+  .status-on-blue       { background: var(--blue); color: #fff; }
+  .status-idle-purple   { background: var(--purple-soft); color: #6b21a8; }
+  .status-on-purple     { background: var(--purple); color: #fff; }
+  .status-idle-green    { background: var(--green-soft); color: #15803d; }
+  .status-idle-neutral  { background: var(--neutral-soft); color: #475569; }
+  /* ===== 设置详解 ===== */
+  .setting-block {
+    background: var(--bg); border-radius: var(--radius); padding: 20px 24px;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.04); margin-bottom: 14px;
+  }
+  .setting-block h4 { font-size: 14.5px; font-weight: 600; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+  .setting-block h4 .ico { font-size: 15px; }
+  .setting-list { display: flex; flex-direction: column; gap: 10px; }
+  .setting-row { display: flex; gap: 12px; align-items: baseline; }
+  .setting-row .name { font-size: 13px; font-weight: 600; color: var(--text); min-width: 118px; flex-shrink: 0; }
+  .setting-row .desc { font-size: 12.5px; color: var(--text-muted); line-height: 1.65; }
+  .setting-row .default { font-size: 11.5px; color: var(--text-hint); white-space: nowrap; }
+  .btn-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 4px; }
+  .btn-card {
+    background: var(--bg-secondary); border-radius: 8px; padding: 12px 14px;
+    font-size: 12.5px; line-height: 1.6;
+  }
+  .btn-card b { display: block; font-size: 13px; color: var(--accent-deep); margin-bottom: 4px; }
+  .btn-card span { color: var(--text-muted); font-size: 12px; }
+  /* ===== 快速上手 ===== */
+  .steps { background: var(--bg); border-radius: var(--radius); padding: 26px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+  .step-list { display: flex; flex-direction: column; gap: 18px; }
+  .step { display: flex; gap: 14px; align-items: flex-start; }
+  .step-num {
+    width: 30px; height: 30px; border-radius: 50%; background: var(--accent); color: #fff;
+    display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; flex-shrink: 0;
+  }
+  .step-content h5 { font-size: 14.5px; font-weight: 600; margin-bottom: 4px; }
+  .step-content p { font-size: 13px; color: var(--text-muted); line-height: 1.65; }
+  /* ===== 界面入口 ===== */
+  .ui-guide { background: var(--bg); border-radius: var(--radius); padding: 26px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+  .ui-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+  .ui-item { padding: 14px; background: var(--bg-secondary); border-radius: 8px; }
+  .ui-item h5 { font-size: 13.5px; font-weight: 600; margin-bottom: 5px; color: var(--accent-deep); }
+  .ui-item p { font-size: 12.5px; color: var(--text-muted); line-height: 1.65; }
+  /* ===== 提示块 ===== */
+  .tip {
+    background: var(--accent-soft); border-left: 3px solid var(--accent);
+    border-radius: 8px; padding: 12px 16px; font-size: 12.5px; color: var(--text-muted); line-height: 1.7;
+    margin-bottom: 16px;
+  }
+  .tip b { color: var(--accent-deep); }
+  /* ===== 底部 ===== */
+  .footer { text-align: center; padding: 20px; color: var(--text-hint); font-size: 12.5px; line-height: 1.8; }
+  /* ===== 版本变化卡片 ===== */
+  .intro-text { font-size: 13.5px; color: var(--text-muted); line-height: 1.75; margin-bottom: 20px; }
+  .card { background: var(--bg); border-radius: var(--radius); padding: 20px 24px; box-shadow: 0 1px 6px rgba(0,0,0,0.04); margin-bottom: 14px; }
+  .card h3 { font-size: 15px; font-weight: 600; margin-bottom: 10px; }
+  .card p { font-size: 13px; color: var(--text-muted); line-height: 1.75; margin-bottom: 8px; }
+  .card ul { list-style: none; margin-top: 6px; }
+  .card li { font-size: 12.8px; color: var(--text-muted); padding: 4px 0 4px 16px; position: relative; line-height: 1.65; }
+  .card li::before { content: "·"; position: absolute; left: 4px; color: var(--text-hint); font-weight: bold; }
+  .card code { background: var(--bg-secondary); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+  /* ===== 响应式 ===== */
+  @media (max-width: 768px) {
+    .hero { padding: 36px 20px 56px; }
+    .hero h1 { font-size: 26px; }
+    .highlights { grid-template-columns: 1fr; }
+    .feature-grid { grid-template-columns: 1fr; }
+    .ui-grid { grid-template-columns: 1fr; }
+    .btn-grid { grid-template-columns: 1fr; }
+    .setting-row { flex-direction: column; gap: 2px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== Hero ===== -->
+<div class="hero">
+  <h1>萌宝小秘书</h1>
+  <div class="version">v1.5.4 · 对应脚本 release_v1.5.4（1.5 主线 + 四处补丁）</div>
+  <p class="tagline">
+    Discuz 论坛增强套件 —— 看图更方便、翻页更顺滑、收藏更省心
+  </p>
+</div>
+
+<div class="container">
+
+  <!-- ===== 核心亮点 ===== -->
+  <div class="highlights">
+    <div class="highlight-card">
+      <div class="icon-wrap">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4096ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+          <circle cx="8.5" cy="8.5" r="1.5"/>
+          <polyline points="21 15 16 10 5 21"/>
+        </svg>
+      </div>
+      <h3>看图预览</h3>
+      <p>列表页、搜索页、收藏页都能直接看图，点击打开全屏画廊，再也不用一个个点进去看</p>
+    </div>
+    <div class="highlight-card">
+      <div class="icon-wrap">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4096ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M17 1l4 4-4 4"/>
+          <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+          <path d="M7 23l-4-4 4-4"/>
+          <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+        </svg>
+      </div>
+      <h3>智能翻页</h3>
+      <p>点一下翻页球就把下一页接在列表后面，不用跳转页面；右键可让它自动翻到底，翻页后自动联动搜索和看图缓存</p>
+    </div>
+    <div class="highlight-card">
+      <div class="icon-wrap">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4096ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+        </svg>
+      </div>
+      <h3>收藏用户</h3>
+      <p>喜欢的用户一键加星，他发的帖子在列表页自动高亮，再也不怕刷丢</p>
+    </div>
+  </div>
+
+  <!-- ===== 一、三步快速上手 ===== -->
+  <div class="feature-section">
+    <h2 class="section-title">一、三步快速上手</h2>
+    <div class="steps">
+      <div class="step-list">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-content">
+            <h5>打开任意板块列表页</h5>
+            <p>脚本自动生效。帖子下方会出现图片缩略图，屏幕左侧出现悬浮球。板块列表页上是<strong>翻页球（紫）</strong>和<strong>看图球（蓝）</strong>两个；搜索页/导读页多一个<strong>过滤球（绿）</strong>；帖子详情页则是<strong>增强球（近白）</strong>。</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-content">
+            <h5>点一下悬浮球试试功能</h5>
+            <p>先点最下面的翻页球左键，加载下一页；再点看图球的左键，把整页的图都加载出来。想看全屏，点帖子下方的缩略图即可。</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-content">
+            <h5>打开设置调整偏好</h5>
+            <p>油猴菜单里的「设置」。画廊背景色、卡片色、收藏高亮背景和标题色都能自定义；收藏用户在设置里的「收藏馆」入口卡片进入。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 二、四个悬浮球 ===== -->
+  <div class="feature-section">
+    <h2 class="section-title">二、四个悬浮球</h2>
+    <p class="section-intro">
+      四个球都固定在<strong>屏幕左侧</strong>，从上到下排列、互不重叠，全部可以<strong>按住拖动</strong>改位置，松手后位置会被记住。<br>
+      不是每个页面都有四个：过滤球只在搜索页/导读页出现，增强球只在帖子详情页出现。
+    </p>
+
+    <div class="fab-guide">
+
+      <div class="fab-item">
+        <div class="fab-demo fab-demo-guolv">🎯</div>
+        <div class="fab-info">
+          <h5>过滤球（绿色）</h5>
+          <div class="fab-where">出现位置：<b>搜索页、导读页</b></div>
+          <p><b>左键</b>：打开 / 收起板块过滤面板</p>
+          <p><b>右键</b>：打开屏蔽词设置弹窗（关键词规则，可勾选「仅过滤当前板块」）</p>
+          <p><b>拖拽</b>：移动位置</p>
+          <div class="status-row"><span class="status status-idle-green">常驻绿色，无状态变化</span></div>
+        </div>
+      </div>
+
+      <div class="fab-item">
+        <div class="fab-demo fab-demo-zengqiang">⚡</div>
+        <div class="fab-info">
+          <h5>增强球（近白）</h5>
+          <div class="fab-where">出现位置：<b>帖子详情页</b></div>
+          <p><b>左键</b>：打开 / 收起功能面板</p>
+          <p><b>右键</b>：打开评论侧边面板</p>
+          <p><b>拖拽</b>：移动位置</p>
+          <p>面板里是画廊、收藏帖子、评分、购买、附件跳转等入口</p>
+          <div class="status-row"><span class="status status-idle-neutral">常驻近白，无状态变化</span></div>
+        </div>
+      </div>
+
+      <div class="fab-item">
+        <div class="fab-demo fab-demo-kantu">🖼️</div>
+        <div class="fab-info">
+          <h5>看图球（蓝色）</h5>
+          <div class="fab-where">出现位置：<b>板块列表页、搜索页、空间收藏页、导读页、用户主题页</b></div>
+          <p><b>左键</b>：开启 / 停止持续加载（把列表里所有帖子的图都加载出来）</p>
+          <p><b>右键</b>：停止加载并收起所有图片预览（缓存保留）</p>
+          <p><b>拖拽</b>：移动位置</p>
+          <div class="status-row">
+            <span class="status status-idle-blue">浅蓝 · 就绪</span>
+            <span class="status status-on-blue">蓝色描边 + 光晕 + 旋转 · 持续加载中</span>
+            <span class="status status-off-gray">灰 · 已收起</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="fab-item">
+        <div class="fab-demo fab-demo-pager">📄</div>
+        <div class="fab-info">
+          <h5>翻页球（紫色）</h5>
+          <div class="fab-where">出现位置：<b>板块列表页、搜索页、空间收藏页、小黑屋、导读页、用户主题页、用户回复页</b></div>
+          <p><b>左键</b>：加载下一页（点一次加一页）</p>
+          <p><b>右键</b>：开启自动翻页，一页页追到末页；再点左键或右键即停止</p>
+          <p><b>拖拽</b>：移动位置</p>
+          <p>球下方有紫色「共 N 页」小标签，加载后会显示当前已累积到第几页；加载慢时会临时变成「加载中…」</p>
+          <div class="status-row">
+            <span class="status status-idle-purple">浅紫 · 就绪</span>
+            <span class="status status-on-purple">紫色描边 + 光晕 + 旋转 · 持续加载中</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="tip" style="margin-top:16px;">
+      <b>位置乱了怎么办：</b>打开设置 → 点「📍 重置位置」，四个球会立刻回到默认位置（左侧 24px，从下往上 200 / 280 / 360 / 720px），不用刷新。
+    </div>
+  </div>
+
+    <!-- ===== 三、全部功能一览 ===== -->
+  <div class="feature-section">
+    <h2 class="section-title">三、全部功能一览</h2>
+    <div class="feature-grid">
+
+      <div class="feature-item">
+        <h4><span class="dot"></span>萌宝看图</h4>
+        <p>多场景支持：版块列表页、搜索页、导读页、收藏页、用户主题页都能直接预览图片。</p>
+        <ul>
+          <li>点击缩略图打开全屏画廊，画廊是一整面格子墙，每格一张图</li>
+          <li>点格子进单张大图，图片按窗口适配：小图保持<strong>原始尺寸</strong>不放大，大图等比缩到窗口内、整张完整可见</li>
+          <li>切图用普通滚轮，缩放用 <strong>Ctrl + 滚轮</strong>（0.3–5 倍）；大图状态不接管拖动，想 1:1 看细节就用它放大</li>
+          <li>顶部条上有旋转按钮，点一次转 90°</li>
+          <li>退出有三种：<strong>双击图片</strong>、<strong>点顶部那一整条</strong>、按 <strong>Esc</strong>；小图四周的空白也能点出去</li>
+          <li>不同帖子的图之间用一条分隔线隔开，不会混成一片</li>
+          <li>关闭大图回到列表后，刚才看的那张会闪一圈琥珀色光圈帮你定位</li>
+          <li>画廊背景色、卡片色可自定义；已加载的图片本地缓存，下次打开更快</li>
+        </ul>
+      </div>
+
+      <div class="feature-item">
+        <h4><span class="dot"></span>设置与导入导出</h4>
+        <p>所有配置都在设置面板里调整，支持全量导出/导入，换设备一键迁移。</p>
+        <ul>
+          <li>设置弹窗防误关：点遮罩不会关，只有「取消 / 保存设置」能退出</li>
+          <li>颜色类设置<strong>保存后立即生效</strong>，不用刷新页面；排序、白名单等少数项仍需刷新</li>
+          <li>「恢复默认」清空全部记录并自动刷新，不需要手动刷</li>
+          <li>收藏、头像、浏览历史、过滤词均<strong>按账号独立</strong>，换账号各看各的</li>
+          <li>收藏馆支持单独导出/导入，可以只搬收藏这一块</li>
+          <li>全量导出含参数、收藏、评分、收藏用户与站点白名单；<strong>不含</strong>悬浮球位置、看图缓存和已读历史</li>
+          <li>有「调试日志」开关，排查问题时打开</li>
+          <li>右上角「📖 使用帮助」可重新弹出新手上手引导</li>
+        </ul>
+      </div>
+
+      <div class="feature-item">
+        <h4><span class="dot"></span>萌宝搜索 / 过滤</h4>
+        <p>左键开板块过滤面板筛板块，右键开屏蔽词设置（支持精确、正则与排除词）。</p>
+        <ul>
+          <li>过滤词语法：<code>广告</code> 含词即藏、<code>=求资源</code> 精确匹配、<code>/公告/</code> 正则匹配、<code>!置顶</code> 排除词</li>
+          <li>支持「仅过滤当前板块」作用域</li>
+          <li>过滤词弹窗有「取消」按钮——点取消不保存，不会误改</li>
+          <li>过滤配置按账号独立：多账号登录各筛各的</li>
+        </ul>
+      </div>
+
+      <div class="feature-item">
+        <h4><span class="dot"></span>收藏用户</h4>
+        <p>楼层、列表页、资料页、个人主题页与个人回复页都能点星星收藏用户。
+        <ul>
+          <li>收藏后他的帖子在列表页和搜索结果页都自动高亮（蓝底橙标题）</li>
+          <li>高亮颜色可在设置里自定义</li>
+          <li>所有收藏用户集中在独立的「收藏馆」弹窗里管理，不在通用设置里</li>
+          <li>支持分组管理（拖拽排序、右键重命名/删除）、导出导入</li>
+        </ul>
+      </div>
+
+      <div class="feature-item">
+        <h4><span class="dot"></span>浏览历史（已读标记）</h4>
+        <p>你看过的帖子标题会自动变灰，下次再刷到一眼就知道「这个我看过了」。</p>
+        <ul>
+          <li>覆盖<strong>版块列表页、搜索结果页、个人主题页</strong>三处，翻页后新加载的行也会自动补上</li>
+          <li>三态可选：<strong>关闭 / 变灰划线 / 只变灰</strong>，默认「变灰划线」。只加已读态、不做高亮，收藏用户的名字仍保持收藏色</li>
+          <li>底色可在设置里改，改完<strong>保存即生效</strong>，搜索结果页同样跟随</li>
+        </ul>
+      </div>
+
+      <div class="feature-item">
+        <h4><span class="dot"></span>窄屏模式</h4>
+        <p>嫌 1200 版心太宽，可以一键压回 3.4 时代的 960。</p>
+        <ul>
+          <li>只作用于<strong>版块列表、导读、帖子、搜索页</strong>四类阅读页，默认关闭</li>
+          <li>首页、个人中心设置、勋章、排行榜保持论坛原样——这几页内部有定宽组件，收窄后必错位</li>
+          <li>导航条、页头 logo、右上用户信息、页脚边缘一起收窄，不是只窄中间而两边错位</li>
+          <li>切到论坛「全屏」档时自动放开，不会叠加</li>
+        </ul>
+      </div>
+
+      <div class="feature-item">
+        <h4><span class="dot"></span>评论侧边面板</h4>
+        <p>右侧边栏实时显示帖子评论流，增强球右键可打开。</p>
+        <ul>
+          <li>支持评论翻页</li>
+          <li>支持关键词过滤</li>
+          <li>评论列表可按最小字数过滤，太短的评论自动隐藏</li>
+          <li>面板宽度可用滑条调整</li>
+        </ul>
+      </div>
+
+      <div class="feature-item">
+        <h4><span class="dot"></span>萌宝翻页</h4>
+        <p>两种模式：左键加载下一页（接在列表后面），右键开自动翻页，一页页追到末页。</p>
+        <ul>
+          <li>翻页后自动联动搜索面板与看图缓存</li>
+          <li>支持调整翻页延时（0–10 秒），防止请求过快</li>
+          <li>评论面板的翻页栏有「尾页」，可直接跳到最后一页</li>
+          <li>小黑屋页也支持持续加载</li>
+        </ul>
+      </div>
+
+      <div class="feature-item">
+        <h4><span class="dot"></span>自定义头像昵称</h4>
+        <p>评论侧边面板和收藏馆里可以用自己的头像和昵称。</p>
+        <ul>
+          <li>固定 9 个槽位，<strong>点哪一格就放进哪一格</strong>，空着的槽位保留位置</li>
+          <li>可拖拽调整顺序：拖到空格是移动，拖到已有头像的格子是两者交换；删掉的格子留空、后面不前移</li>
+          <li>不再自带内置头像，全部由自己添加；本地压缩，不上传服务器</li>
+          <li>评论区、收藏馆共用同一套头像</li>
+        </ul>
+      </div>
+
+      <div class="feature-item">
+        <h4><span class="dot"></span>右键点击用户名</h4>
+        <p>右键点任意用户名，弹出快捷菜单，直达对方主页。</p>
+        <ul>
+          <li>五处都能用：<strong>列表页、搜索结果页、帖子详情页、收藏馆、评论侧边面板</strong></li>
+          <li>默认去「个人资料」，可在设置里改成「个人主题」或「个人回复」</li>
+          <li>跳转地址带完整参数，点「个人主题」直接落到对方的主题列表</li>
+          <li>不想用可在设置里选「关闭」，右键恢复浏览器原生菜单</li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+
+<!-- ===== 四、设置面板详解 ===== -->
+  <div class="feature-section">
+    <h2 class="section-title">四、设置面板详解</h2>
+    <p class="section-intro">
+      打开方式：油猴菜单里的「设置」。面板分四块：通用设置、萌宝看图、收藏馆入口、底部按钮区。
+    </p>
+
+    <div class="setting-block">
+      <h4><span class="ico">⚙️</span>通用设置</h4>
+      <div class="setting-list">
+        <div class="setting-row">
+          <span class="name">窄屏模式</span>
+          <span class="desc">把论坛版心从 1200 压回 960。默认关闭。只作用于版块列表、导读、帖子、搜索页；首页、个人中心、勋章、排行榜保持论坛原样，切到全屏档时自动放开。保存后会提示当前页是否已生效。</span>
+        </div>
+        <div class="setting-row">
+          <span class="name">已读标记</span>
+          <span class="desc">浏览过的帖子怎么标记：关闭 / 变灰划线 / 只变灰。默认「变灰划线」。改完保存即生效，搜索结果页同样跟随。</span>
+        </div>
+        <div class="setting-row">
+          <span class="name">已读标记底色</span>
+          <span class="desc">已读帖子整行的底色，只对未收藏的帖子生效。默认 #f0f0f0。</span>
+          <span class="default">默认 #f0f0f0</span>
+        </div>
+        <div class="setting-row">
+          <span class="name">按发帖时间排序</span>
+          <span class="desc">开启后，所有板块自动按发帖时间倒序排列，永远看最新的。默认开启。</span>
+        </div>
+        <div class="setting-row">
+          <span class="name">翻页延时（秒）</span>
+          <span class="desc">自动翻页时每页之间的等待间隔，防止请求过快。范围 0–10，默认 5。</span>
+        </div>
+        <div class="setting-row">
+          <span class="name">右键点击用户名</span>
+          <span class="desc">右键点用户名弹出的快捷菜单去哪个页面：个人资料 / 个人主题 / 个人回复，最后一项「关闭」表示不接管右键、保留浏览器原生菜单。默认「个人资料」。</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="setting-block">
+      <h4><span class="ico">🖼️</span>萌宝看图（6 项）</h4>
+      <div class="setting-list">
+        <div class="setting-row">
+          <span class="name">画廊背景色</span>
+          <span class="desc">全屏画廊的大背景色</span>
+          <span class="default">默认 #faf8f5</span>
+        </div>
+        <div class="setting-row">
+          <span class="name">画廊卡片色</span>
+          <span class="desc">画廊里每张图片格的底色</span>
+          <span class="default">默认 #f8fafc</span>
+        </div>
+        <div class="setting-row">
+          <span class="name">收藏高亮背景</span>
+          <span class="desc">列表页收藏用户那一行的整行底色</span>
+          <span class="default">默认 #dbeafe</span>
+        </div>
+        <div class="setting-row">
+          <span class="name">收藏高亮标题</span>
+          <span class="desc">收藏用户帖子标题的文字色</span>
+          <span class="default">默认 #d97706</span>
+        </div>
+        <div class="setting-row">
+          <span class="name">预览图数量</span>
+          <span class="desc">帖子标题下并排显示几张预览图。默认 3 张。</span>
+          <span class="default">默认 3</span>
+        </div>
+        <div class="setting-row">
+          <span class="name">预览图高度</span>
+          <span class="desc">单张预览图的高度，范围 120–320。默认 200。</span>
+          <span class="default">默认 200</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="setting-block">
+      <h4><span class="ico">⭐</span>萌宝收藏（入口）</h4>
+      <div class="setting-list">
+        <div class="setting-row">
+          <span class="name">收藏馆入口</span>
+          <span class="desc">设置里只放一张卡片，显示「收藏馆」和当前的「N 位用户 · M 个分组」，右侧一个「打开」按钮。</span>
+        </div>
+        <div class="setting-row">
+          <span class="name">收藏馆弹窗</span>
+          <span class="desc">点开「打开」进入独立弹窗，宽 900px。从上到下是标题行（含「✏️ 编辑」与右上角 ×）、分组胶囊行、用户胶囊列表、三个管理按钮。拖胶囊可排序；拖到上方分组 tab 上松手即归入该组；右键胶囊进入该用户主页。</span>
+        </div>
+        <div class="setting-row">
+          <span class="name">三个管理按钮</span>
+          <span class="desc">新建分组、导出、导入，都在收藏馆弹窗底部。</span>
+        </div>
+        <div class="setting-row">
+          <span class="name">批量编辑</span>
+          <span class="desc">点标题行右侧「✏️ 编辑」进入勾选模式，工具条展开：全选 / 移入分组 / 删除选中 (N) / 取消。移入分组时弹窗选目标，「未分组」表示移出分组；批量移动后自动退出编辑态。</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="setting-block">
+      <h4><span class="ico">🔘</span>底部按钮区（6 个）</h4>
+      <div class="btn-grid">
+        <div class="btn-card"><b>👤 头像设置</b><span>评论区和收藏馆的头像、昵称、多槽位管理</span></div>
+        <div class="btn-card"><b>📍 重置位置</b><span>四个悬浮球立刻回到默认位置，不用刷新</span></div>
+        <div class="btn-card"><b>🧹 清除缓存</b><span>清空看图模块已缓存的图片</span></div>
+        <div class="btn-card"><b>📤 导出配置</b><span>全部配置导出成 JSON 到剪贴板</span></div>
+        <div class="btn-card"><b>📥 导入配置</b><span>从剪贴板 JSON 恢复全部配置</span></div>
+        <div class="btn-card"><b>↩️ 恢复默认</b><span>清空所有设置、收藏、位置、缓存，彻底回到出厂状态；点完弹窗立即关闭，页面自动刷新</span></div>
+      </div>
+      <div class="tip" style="margin:14px 0 0;">
+        <b>底部还有一行：</b>左边是「调试日志」开关（排查问题用，<strong>即时生效</strong>，不用刷新），右边是「取消 / 保存设置」。<br>
+        <b>右上角：</b>「📖 使用帮助」——点了会重新弹一遍新手上手引导卡片；旁边的「ℹ️ 关于」显示当前版本、作者、仓库与使用指南地址。
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 五、界面入口在哪 ===== -->
+  <div class="feature-section">
+    <h2 class="section-title">五、界面入口在哪</h2>
+    <div class="ui-guide">
+      <div class="ui-grid">
+        <div class="ui-item">
+          <h5>左侧悬浮球</h5>
+          <p>固定在屏幕<strong>左边</strong>，从下往上依次是翻页（📄）、看图（🖼️）、增强（⚡）、过滤（🎯）。全部可拖动。</p>
+        </div>
+        <div class="ui-item">
+          <h5>油猴菜单</h5>
+          <p>浏览器右上角油猴图标 → 萌宝小秘书，里面有两项：<strong>🌐 白名单管理</strong> 和 <strong>设置</strong>。</p>
+        </div>
+        <div class="ui-item">
+          <h5>设置面板</h5>
+          <p>从油猴菜单「设置」进入。宽 600px，含通用设置、看图配色、收藏馆入口、6 个按钮。</p>
+        </div>
+        <div class="ui-item">
+          <h5>白名单管理</h5>
+          <p>从油猴菜单「🌐 白名单管理」进入。默认已内置常用站群域名，可自行增删；不在名单里的站点不加载。</p>
+        </div>
+        <div class="ui-item">
+          <h5>评论侧边面板</h5>
+          <p>帖子详情页里，右键点增强球（⚡）打开。显示实时评论流，可翻页、可按字数过滤，面板宽度用滑条调整。</p>
+        </div>
+        <div class="ui-item">
+          <h5>画廊</h5>
+          <p>点任意帖子下方的缩略图进入。顶部标题栏显示帖子标题和「共 N 张」计数。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 六、弹窗与数据约定 ===== -->
+  <div class="feature-section">
+    <h2 class="section-title">六、弹窗与数据约定</h2>
+    <div class="feature-grid">
+      <div class="feature-item">
+        <h4><span class="dot"></span>弹窗防误关</h4>
+        <p>白名单、过滤词、通用设置、头像设置等主要弹窗统一规则：</p>
+        <ul>
+          <li>点遮罩<strong>不会</strong>关闭弹窗</li>
+          <li>只能点「取消」或「保存 / 确定 / 导入」退出</li>
+          <li>「取消」不保存任何改动，无副作用</li>
+        </ul>
+      </div>
+      <div class="feature-item">
+        <h4><span class="dot"></span>数据按账号隔离</h4>
+        <p>以下数据全部按登录用户 ID 分开存，换账号各看各的：</p>
+        <ul>
+          <li>收藏用户、评分记录</li>
+          <li>浏览历史、已读标记</li>
+          <li>过滤词配置、头像</li>
+          <li>四个悬浮球的位置和折叠状态</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+    <!-- ===== 七、1.0：起点 ===== -->
+  <div class="feature-section">
+    <h2 class="section-title">七、1.0：起点</h2>
+    <p class="section-intro">1.0 是脚本的第一个正式发布版，能力骨架在这一版定下来；后面的 1.1 到 1.4 都是在这套骨架上修补，没有推翻重做。所以本指南以 1.5 为准来写功能，版本变化从 1.0 这个起点往下排。</p>
+
+    <div class="card">
+      <h3>1.0 定下来的能力</h3>
+      <ul>
+        <li>四颗悬浮球：看图、翻页、过滤、增强</li>
+        <li>全屏图片画廊与单张大图查看器（滚轮切图、Ctrl + 滚轮缩放）</li>
+        <li>列表页持续翻页、搜索页板块过滤与关键词黑名单</li>
+        <li>收藏用户（收藏馆 + 分组管理）与收藏帖子</li>
+        <li>评分弹窗自动填满分、评论侧边面板</li>
+        <li>浏览历史已读标记、自定义头像昵称</li>
+        <li>域名白名单管理、全量配置导出/导入</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h3>下面四节怎么读</h3>
+      <p>按「你在使用中会注意到什么变化」来列，不按代码顺序。开发期那些 beta 迭代过程不在指南里展开——只讲 1.0 之后每个正式版改了什么。</p>
+    </div>
+  </div>
+
+<!-- ===== 八、1.1 版本变化 ===== -->
+  <div class="feature-section">
+  <h2 class="section-title">八、1.0 → 1.1 有什么变化</h2>
+
+  <p class="intro-text">1.1 动的主要是「看图」和「评分」两块，都是实际用起来会觉得别扭的地方。这里按「你会注意到什么」来列，不按代码顺序。</p>
+
+  <div class="card">
+    <h3>大图不再缩到刚好装下，改成原尺寸</h3>
+    <p>以前大图会等比缩到「整张刚好塞进屏幕」。一张整屏截图放到满屏时，图顶到边、四周一点缝都不剩——想退出都没地方点。现在改成<strong>按原始像素显示</strong>：不放大也不缩小，居中摆着，超出屏幕的部分自己溢出。</p>
+    <p>特别大的图（三千多像素宽那种）默认只能看到中间一块，想看边缘用 <strong>Ctrl + 滚轮缩小</strong>（0.3–5 倍）。<strong>这条在 1.2 又调整回去了</strong>，见下一节「1.1 → 1.2」。</p>
+  </div>
+
+  <div class="card">
+    <h3>退出大图：双击、点顶部条、Esc</h3>
+    <p>以前只有「点图片外面那一圈黑」能退出，整屏截图铺满时这一圈根本不存在。现在三个出口：</p>
+    <ul>
+      <li><strong>双击图片</strong>——单击不退出，避免手滑划走</li>
+      <li><strong>点顶部那一整条</strong>——含计数区域，条上任何空白都能点</li>
+      <li><strong>Esc</strong></li>
+    </ul>
+    <p>小图四周仍有留白，点空白照样能退。关闭按钮也从「只有从帖子列表进来才显示」改成<strong>一直显示</strong>。</p>
+  </div>
+
+  <div class="card">
+    <h3>顶部条重新做了一遍</h3>
+    <p>高度 56 → 52，渐变收得更干脆，不再是糊一层黑；底部加了一条极细的白线做分界。计数从白底胶囊改成纯文字，亮图黑图都压得住。</p>
+    <p>按钮从「深底 + 白边」改成玻璃感的白描边，鼠标移上去只提亮、不再整颗放大跳动；关闭键单独区分，移上去变暖红，一眼看出是退出。</p>
+  </div>
+
+  <div class="card">
+    <h3>拖动功能取消了</h3>
+    <p>原尺寸下本来能按住拖动，但看图这件事本身就是看中间，拖来拖去反而容易误操作。现在不拖了，光标也不再是抓手。</p>
+  </div>
+
+  <div class="card">
+    <h3>评分自动填满分</h3>
+    <p>打开评分弹窗时，分数直接填到这一项的上限，你只选理由、点确定。上限是从评分下拉选项里读的（论坛没把它写在输入框的 max 属性里），有几项评分就各填各的。</p>
+    <p>论坛的 ajax 偶尔会把值刷回 0，脚本会在 250ms 和 900ms 各补一次；你自己改数字或点下拉，脚本立刻停手。</p>
+  </div>
+
+  <div class="card">
+    <h3>重复评分不再叠三条提示</h3>
+    <p>对同一个帖子重复评分时，以前会同时出现论坛弹窗、红色 toast、深色提示三条。现在脚本这边不弹了，只把「👍 评分」按钮标成已评，屏幕上只留论坛那一个带「确定」的弹窗。其他评分错误仍会给红色提示。</p>
+  </div>
+
+  <div class="card">
+    <h3>个人主题页也有已读标记了</h3>
+    <p>以前只有版块列表页和搜索结果页会标已读，点进某个人的「个人主题」列表，看过的帖子还是正常颜色。现在这一页也标了——灰底、标题变灰加划线，不做高亮，收藏用户的名字仍保持收藏色。</p>
+    <p>判定前提不变：得先打开过那个帖子才会变灰。</p>
+  </div>
+
+  </div>
+
+  <!-- ===== 九、1.2 版本变化 ===== -->
+  <div class="feature-section">
+  <h2 class="section-title">九、1.1 → 1.2 有什么变化</h2>
+
+  <p class="intro-text">1.2 没有加新功能，主线是三件事：<strong>收藏馆的编辑与归组交互重做</strong>、<strong>下线「收藏关键词」</strong>、以及<strong>修掉一批看起来「功能坏了」的隐性 bug</strong>。照样按「你会注意到什么」来列，不按代码顺序。</p>
+
+  <div class="card">
+    <h3>「收藏关键词」下线了</h3>
+    <p>以前帖子页右侧的评论面板上有「评论区 / 收藏馆」两个标签页，收藏馆那一页用来存关键词、按关键词找帖子。1.2 起这块整体移除。</p>
+    <ul>
+      <li>评论面板现在只剩评论，不再有标签切换</li>
+      <li>收藏馆弹窗底部的「🔍 收藏关键词 N 个」入口一并去掉</li>
+      <li>本地残留的关键词数据会在脚本启动时自动清掉，不用手动删</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>收藏馆：编辑不再单独占一行</h3>
+    <p>以前「✏️ 编辑」按钮独占一行，下面再跟一条工具条，弹窗上半部分很挤。现在：</p>
+    <ul>
+      <li>「✏️ 编辑」放进标题行右侧，和右上角的 <strong>×</strong> 并排，非编辑态不占额外高度</li>
+      <li>点「编辑」后工具条才整条展开：全选 / 移入分组 / 删除选中 (N) / 取消</li>
+      <li>底部原来那行「关闭」删掉了，统一用右上角 ×（点遮罩、按 Esc 也照样能关）</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>编辑态可以直接「移入分组」</h3>
+    <p>以前要换分组只能一个个拖。现在勾选一批用户后，点「移入分组」弹出分组选择面板，点目标分组就整批搬过去，<strong>搬完自动退出编辑态</strong>——因为列表会变，保留选中容易误删看不见的条目。</p>
+    <p>另外「未分组」的提示改成「已把 N 位用户移出分组」，不再说成移入一个叫「未分组」的组。</p>
+  </div>
+
+  <div class="card">
+    <h3>拖胶囊换分组：不再弹新窗口，光标也不再变禁止</h3>
+    <p>拖拽修了两个问题：</p>
+    <ul>
+      <li>拖到空白处松手，以前浏览器会当成纯文本<b>新开一个窗口搜索「uid:455002」</b>；现在拖拽数据改成自定义类型，不会再触发</li>
+      <li>拖动过程中光标中途显示 <strong>⊗</strong>（禁止），但分组 tab 其实已经高亮——现在拖胶囊期间临时关掉分组 tab 自身的拖拽属性，从拿起胶囊到松手全程都是可移动光标</li>
+    </ul>
+    <p>落点行为不变：拖到自定义分组 tab 归组、拖到「未分组」移出分组、拖到「全部」明确拒绝。</p>
+  </div>
+
+  <div class="card">
+    <h3>胶囊不再「鼠标一划过就变宽」</h3>
+    <p>以前鼠标停在胶囊上会展开「切换分组 / ✕」两个图标，胶囊变宽，把后面的胶囊挤到第二行，整片列表跟着跳。现在胶囊宽度恒定，那些图标改成了编辑态的勾选框——只在你要批量操作时才出现。</p>
+  </div>
+
+  <div class="card">
+    <h3>分组多到放不下时，改成横向滚动</h3>
+    <p>分组 tab 原来会换行，组一多就把弹窗撑高。现在锁成单行、左右滚动（滚动条隐藏），切到靠右的分组再重画也不会跳回开头。tab 改成浅灰底、胶囊仍是白底描边，两层能分清。</p>
+  </div>
+
+  <div class="card">
+    <h3>大图改成「整张看得见」</h3>
+    <p>1.1 把大图改成了按原始像素显示，结果超大图（比如 1536×2048）在 1080 高的屏幕上只能看到中间一块，四周被裁掉，想退出都找不到边。1.2 改回<strong>按窗口适配</strong>：</p>
+    <ul>
+      <li>比窗口大的图，等比缩到窗口内，<strong>整张完整可见、不裁剪</strong></li>
+      <li>比窗口小的图，保持原始尺寸，<strong>不放大</strong></li>
+      <li>左右留白从 56px 收到 24px，横图能多显示一点</li>
+      <li>想 1:1 看细节，仍然用 <strong>Ctrl + 滚轮</strong>放大</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>评论面板空白修复</h3>
+    <p>1.2 早期版本里，帖子页的评论面板会变成<strong>只有头像、「N 条评论」标题和一条宽度滑条，中间全空</strong>。原因是模板里多包了一层 <code>&lt;template&gt;</code>，被运行时编译当成原生元素，把分页行和评论列表整块吞掉了。修复后列表正常显示，分页也能用。</p>
+  </div>
+
+  <div class="card">
+    <h3>搜索页宽度和论坛对齐了</h3>
+    <p>搜索页的内容宽度从 1400 收回到 <strong>1200</strong>，和论坛列表页、首页、帖子页的版心一致，四页左右边缘完全重合（47 / 1247）。搜索页本身没有 <code>#wp</code> 容器，所以把外层 <code>#ct</code> 也一并收进版心；卡片左右各 12px 的内边距去掉，边缘更齐。</p>
+  </div>
+
+  <div class="card">
+    <h3>收藏星标不再挂错地方</h3>
+    <p>以前打开短消息（<code>do=pm</code>）、提醒（<code>do=notice</code>）这类页面，右上角「当前登录用户」名字后面也会多出一个收藏星标。原因是这些页面和「个人资料页」共用同一个地址参数。现在只认资料页和个人主题页，其它子页面不再挂星标。</p>
+  </div>
+
+  </div>
+
+<div class="feature-section">
+  <h2 class="section-title">十、1.2 → 1.3 有什么变化</h2>
+  <p class="section-intro">这一版主要做了三件事：砍掉用不上的功能、把头像做顺、把「改了设置要刷新」这个别扭的地方改掉。</p>
+
+  <div class="card">
+    <h3>「缩小显示」整套下线</h3>
+    <p>增强球面板顶部那对「正常显示 / 缩小显示」胶囊已移除，帖子内图片恢复与不开脚本时一致的显示。原因很直接：这个开关和「点图进大图」的功能重叠，用得很少，却要在面板里常年占一行。</p>
+  </div>
+
+  <div class="card">
+    <h3>内置头像全部移除，改成 9 格自己搭</h3>
+    <p>以前自带的「萌 / 桃」两个内置头像和「恢复内置默认头像」按钮都删了。现在是 9 个空格位，<strong>点哪一格就放进哪一格</strong>，不再强制从第一个开始往后排。</p>
+    <p>支持拖拽换位：拖到空位是移动，拖到已有头像的格子是两者交换。删掉一个头像后那格留空，后面的不往前挤。</p>
+  </div>
+
+  <div class="card">
+    <h3>设置改完不用再刷新了</h3>
+    <p>画廊背景色、画廊卡片色、收藏高亮背景、收藏高亮标题、已读标记底色、已读删除线这 6 项，以及「已读帖子标记」总开关，<strong>保存后当场生效</strong>。以前要手动刷一次页面才看得到效果。</p>
+    <p>「恢复默认」也改顺了：以前点完要等 1.5 秒才自动刷新，而这个窗口里任何一次保存都会把旧值写回去，出现「点了恢复默认却没重置」。现在点完弹窗立即关闭、期间的保存一律拒收，随后页面自动刷新。</p>
+    <p>仍需要刷新的只有「按发帖时间排序」（它要重新请求一个排好序的页面）和域名白名单（脚本启动时就定下来了）。</p>
+  </div>
+
+  <div class="card">
+    <h3>预览图可以调大小了</h3>
+    <p>新增「预览图数量」和「预览图高度」两个设置。前者控制标题下并排显示几张，后者控制单张图的高度（120–320）。嫌列表太挤就调矮一点、少放几张。</p>
+  </div>
+
+  <div class="card">
+    <h3>已读标记能自己配色</h3>
+    <p>已读行底色可以改，「已读加删除线」可以单独关掉。只在搜索结果页也一起跟随设置——之前那一页是写死的，设置改了它不认。</p>
+  </div>
+
+  <div class="card">
+    <h3>几个别扭的地方</h3>
+    <ul>
+      <li><b>打开头像设置不再全选「萌宝」</b>：以前一进弹窗，昵称框就是选中状态，打第一个字就把整段替换了。</li>
+      <li><b>拖头像松手不再弹图片窗口</b>：以前拖完在弹窗外松手，浏览器会按「拖入一张图片」新开一个窗口显示它。</li>
+      <li><b>设置弹窗窄了一点、控件靠右</b>：宽度 640 → 600，输入框和色块贴到右边界，第二列右边不再挂一大片空白。</li>
+      <li><b>头像弹窗定稿为 460px</b>（中途试过 548、500 两个宽度），九格间距拉开，昵称框与「萌宝」两个字高度对齐，删掉了多余的「面板头像设置」标题行。</li>
+      <li><b>评论面板的翻页栏加回「尾页」</b>：顺序是「页码框 / 总页数 · 上一页 · 下一页 · 尾页」，数字和斜杠之间也拉开了距离。</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>支持在线更新了</h3>
+    <p>元数据里加了 <code>@updateURL</code> 和 <code>@downloadURL</code>，指向 jsDelivr 的地址。装上之后，脚本管理器可以自己检查新版本。</p>
+  </div>
+
+</div>
+
+<div class="feature-section">
+  <h2 class="section-title">十一、1.3 → 1.4 有什么变化</h2>
+  <p class="section-intro">这一版开了个新开关、收了个旧账：给嫌 1200 太宽的人一个窄屏模式，把两个已读复选框合成了一个。</p>
+
+  <div class="card">
+    <h3>窄屏模式：版心能回到 960</h3>
+    <p>论坛的「窄」档现在就是 1200，3.4 时代的 960 已经回不去了。这版在设置里加了一个「窄屏模式」开关，默认关闭，想窄就自己窄。</p>
+    <p>它只作用于<strong>版块列表、导读、帖子、搜索页</strong>这四类用来阅读的页面。首页、个人中心设置、勋章、排行榜保持论坛原样——这几页内部有定宽组件（首页的门户幻灯片、双栏模板右栏固定 1010），压到 960 必然错位，与其修一半不如整体不动。</p>
+    <p>收窄的不是中间那一条：导航条、页头 logo、右上角用户信息、搜索栏、页脚边缘会一起收到 960，不会出现「正文窄了、页头还停在 1200」的错位。切到论坛的「全屏」档时自动放开，不用手动关。</p>
+  </div>
+
+  <div class="card">
+    <h3>已读标记合成一个下拉</h3>
+    <p>以前是「已读帖子标记」和「已读加删除线」两个复选框，能勾出「划线开着、标记却关着」这种其实什么都不会发生的组合。现在合成一个下拉：<strong>关闭 / 变灰划线 / 只变灰</strong>。</p>
+    <p>原来存的两个值会自动换算成新的三态，不用重新设置一遍。</p>
+  </div>
+
+  <div class="card">
+    <h3>几个小地方</h3>
+    <ul>
+      <li><b>增强球改近白</b>：默认色从偏灰改成 <code>#f8fafc</code>。没直接用纯白，是因为纯白会和论坛白底融成一片、只剩一圈细边框，认不出那是个球。</li>
+      <li><b>Vue 换生产版</b>：Console 里那条「development build」警告不再出现，每次加载也从约 500KB 降到约 140KB。<b>已经装过的需要卸载重装一次</b>——脚本管理器的 <code>@require</code> 有缓存。</li>
+      <li><b>设置弹窗控件对齐</b>：复选框原来贴标签左对齐、下拉框贴着右边界，一列里三种控件右边参差不齐。现在统一在标签右侧的剩余空间居中。</li>
+      <li><b>首次安装引导多了一行</b>：新装用户看到的引导卡里会说明窄屏模式。老用户不会重弹这张卡。</li>
+      <li><b>「新」角标</b>：设置里的「窄屏模式」挂了个「新」字，过了 11 月 24 日自动消失。</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>修掉的几个 bug</h3>
+    <ul>
+      <li><b>「我的帖子 / 我的收藏」顶部多出来的星标</b>：那两页被误判成个人资料页，顶部的用户名旁边凭空挂了一个收藏星标。</li>
+      <li><b>窄屏时页头没跟着收</b>：logo 和右上角用户信息停在 1200 不动，跟收窄后的正文对不上。</li>
+      <li><b>保存窄屏后看不出生效没有</b>：以前 toast 只说「设置已保存」，现在会说明适用范围、以及当前这一页有没有生效。</li>
+    </ul>
+  </div>
+
+</div>
+
+<div class="feature-section">
+  <h2 class="section-title">十二、1.4 → 1.5 有什么变化</h2>
+  <p class="section-intro">这一版主要在收口：换机、换版本时那份配置备份终于能用了，资料页的收藏星标回到了它该在的位置，几处会误导人的提示也改了口径。</p>
+
+  <div class="card">
+    <h3>旧版导出的配置能导进来了</h3>
+    <p>以前用 1.0 导出的备份，粘进新版导入框会被整批拦下，提示「检测到无法识别的配置项」。原因有两个：1.0 的导出会把没设置过的项也写成空值，新版把这些空值当成坏键；收藏用户的排序表特意做成「按登录账号分开存」的结构，新版又不认识这种形状。</p>
+    <p>现在两类都能过——空值直接跳过、不参与校验，排序表的旧结构也认。导入完会告诉你导进了几项、忽略了几个已经下线的旧设置（内置头像、评论面板收藏这类）。</p>
+  </div>
+
+  <div class="card">
+    <h3>导出的文件更干净了</h3>
+    <p>以前导出的 JSON 里一堆「键存在、值是空」的项，看着像配了几十项，实际大半没设过。现在只写真正设置过的项。</p>
+    <p>弹窗也把范围说清楚了：<strong>不含悬浮球位置、看图临时缓存与已读历史</strong>。这三样本来就不进备份，写出来是为了避免「导出等于全备份」的误解。</p>
+  </div>
+
+  <div class="card">
+    <h3>资料页的收藏星标回到头像旁</h3>
+    <p>有一段时间，别人资料页上的收藏星标看着像不见了。不是没挂，是挂错了地方：落到「统计信息 好友数 / 回帖数」那一行的小字里，灰色空心小星夹在小字中间，等于隐形。</p>
+    <p>现在挂回资料页顶部的用户名栏，也就是头像右侧那一块——1.0 到 1.2 一直挂在这里。找不到才退回到正文里的用户名链接。</p>
+  </div>
+
+  <div class="card">
+    <h3>评论面板的总页数不再跟着离谱</h3>
+    <p>偶尔会碰到论坛分页显示「/ 548368 页」这种数字，一帖明明只有几十条回复。脚本现在认一个必然成立的判断：<strong>页数不可能超过回复数</strong>，因为每页至少有一楼。超过就按回复数重算，所以真实存在的大帖（比如两千条回复）不会被误伤。</p>
+    <p>触发时脚本会把原始值、帖子编号和回复数记在本机，不进配置、也不进备份，下次再出现能回头查。</p>
+  </div>
+
+  <div class="card">
+    <h3>权限不够的帖子不再反复重试</h3>
+    <p>阅读权限不足的帖子，脚本抓不到正文，会显示「⚠️ 未找到帖子内容 [重试]」。以前它会自己反复重试，一直在刷。现在失败一次就停在那儿，想再试就点旁边的 [重试]。</p>
+  </div>
+
+  <div class="card">
+    <h3>几个说清楚的地方</h3>
+    <ul>
+      <li><b>关于入口</b>：通用设置的标题行多了「ℹ️ 关于」，能看版本、作者、仓库和指南地址。脚本管理器的菜单项也带上了版本号。</li>
+      <li><b>大图提示</b>：「放大后可拖动」原来在缩放后面单独列着，现在并成一句「Ctrl+滚轮缩放（放大后可拖动）」，意思更连贯。</li>
+      <li><b>白名单保存提示</b>：补了「其它已打开的页面也要刷新」——白名单在页面加载时读取，只刷当前这一页，别的标签页还是旧的。</li>
+      <li><b>窄屏模式说明</b>：把适用范围写进了提示里，省得每次翻指南。</li>
+      <li><b>收藏提示</b>：从「收藏成功」改成「已收藏该帖」，明确是帖子还是用户。</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>1.5.1–1.5.4 补了什么</h3>
+    <p>四处都是小修，不改功能，只把 1.5 里没做干净的地方收尾。</p>
+    <ul>
+      <li><b>用户主题页 / 回复页也能收藏了</b>：这两类地址里带 <code>view=me</code>，之前被当成「自己的列表页」直接跳过，星标不出现。现在带 uid 的 <code>view=me</code> 认作对方的空间页，星标挂在顶部用户名旁。</li>
+      <li><b>收藏后名字会变蓝</b>：以前只有星标变实心、用户名不变色。现在帖子楼层、评论侧栏、版块列表、搜索结果都能正确高亮，评论面板滚动加载出来的评论也一样。</li>
+      <li><b>楼层跳转不再被顶部条压住</b>：评论面板点「跳转」后，目标楼层会被顶部红条盖住一截。现在按顶部条的实际高度让位，头像和用户名完整露出来。</li>
+      <li><b>看图进度不再出现「278/270」</b>：分子和分母口径统一了，完成数按帖子去重，分母取实时识别到的帖子数，不会再出现分子比总数大。</li>
+      <li><b>手动点过论坛的「下一页」也能继续翻</b>：论坛自己翻页后会把「下一页」链接换成伪地址，脚本照旧去请求就会报「连接被中断」。现在先找真正的下一页地址，找不到就按页码往后推，确实到末页才停。</li>
+    </ul>
+  </div>
+</div>
+
+<div class="footer">
+  萌宝小秘书 · 新手使用指南 v1.5.4<br>
+  对应脚本 release_v1.5.4
+</div>
+</body>
+</html>

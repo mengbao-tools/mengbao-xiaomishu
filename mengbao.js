@@ -9,9 +9,9 @@
 // ==UserScript==
 // @name         萌宝小秘书
 // @namespace    https://violentmonkey.mengbao.local/
-// @version      1.4
-// @updateURL    https://cdn.jsdelivr.net/gh/mengbao-tools/mengbao@main/mengbao.js
-// @downloadURL  https://cdn.jsdelivr.net/gh/mengbao-tools/mengbao@main/mengbao.js
+// @version      1.5
+// @updateURL    https://cdn.jsdelivr.net/gh/mengbao-tools/mengbao-xiaomishu@main/mengbao.js
+// @downloadURL  https://cdn.jsdelivr.net/gh/mengbao-tools/mengbao-xiaomishu@main/mengbao.js
 // @description  Discuz 论坛增强套件：图片画廊预览、大图查看器、搜索过滤、自动翻页、收藏用户与帖子、评论侧边面板、评分自动满分、浏览历史标记、自定义头像
 // @author       Slient_桃萌
 // @icon         https://aka.doubaocdn.com/s/ZHcpkVi54s
@@ -87,7 +87,7 @@
         if (typeof v !== 'object' || v === null || Array.isArray(v)) return false;
         return Object.values(v).every(x => check(x));
     };
-    // v1.2 起移除「收藏关键词」功能：清掉历史残留键，避免死数据留在本地
+    // 早期「收藏关键词」功能已下线：清掉历史残留键，避免死数据留在本地
     try {
         if (typeof GM_deleteValue === 'function') {
             GM_deleteValue('mengbao.comment.favorite');
@@ -448,6 +448,7 @@
         'mengbao.zengqiang.favorite',
         'mengbao.zengqiang.rated',
         'mengbao.zengqiang.favorite_groups',
+        'mengbao.zengqiang.favorite_users_order',
         'mengbao.browse.history',
         'mengbao.avatars.user',
         'mengbao.comment.avatarChoice',
@@ -696,6 +697,9 @@
             window.open(url, '_blank');
         });
     }
+
+    // 当前版本号（菜单与「关于」弹窗展示用）
+    const MB_VERSION = (typeof GM_info !== 'undefined' && GM_info && GM_info.script && GM_info.script.version) ? GM_info.script.version : 'unknown';
 
     // ===================== 域名白名单（@match 通配由 JS 守卫；设置页可编辑） =====================
     // 默认白名单域名（清空自定义配置时回落此项）：1.0 起内置 5 个常用站群域名，精确匹配 hostname
@@ -1041,9 +1045,13 @@
         .mb-setting-row input[type=color]::-webkit-color-swatch-wrapper { padding:0; display:flex; align-items:center; justify-content:center; }
         .mb-setting-row input[type=color]::-webkit-color-swatch { border:none; border-radius:var(--mb-radius-sm); width:100%; height:100%; }
         .mb-setting-h4 { display:flex; justify-content:space-between; align-items:center; margin:0 0 12px; font-size:var(--mb-font-title); color:var(--mb-text-primary); }
-        .mb-setting-h4-right { display:flex; align-items:center; gap:4px; font-size:var(--mb-font-sm); color:var(--mb-text-muted); cursor:pointer; }
-        .mb-setting-h4-right.btn-help { font-size:var(--mb-font-sm); color:#3f7f5c; background:#f2fbf5; padding:4px 10px; border-radius:var(--mb-radius-sm); border:1px solid #d9efdf; user-select:none; transition:all var(--mb-t-fast) ease; }
-        .mb-setting-h4-right.btn-help:hover { background:#e4f6ea; color:#276749; border-color:#c9e8d4; }
+        .mb-setting-h4-right { display:flex; align-items:center; gap:6px; font-size:var(--mb-font-sm); color:var(--mb-text-muted); }
+        .mb-setting-h4-right .btn-help,
+        .mb-setting-h4-right .btn-about { font-size:var(--mb-font-sm); padding:4px 10px; border-radius:var(--mb-radius-sm); border:1px solid; cursor:pointer; user-select:none; transition:all var(--mb-t-fast) ease; }
+        .mb-setting-h4-right .btn-help { color:#3f7f5c; background:#f2fbf5; border-color:#d9efdf; }
+        .mb-setting-h4-right .btn-help:hover { background:#e4f6ea; color:#276749; border-color:#c9e8d4; }
+        .mb-setting-h4-right .btn-about { color:#2c5282; background:#f0f6ff; border-color:#d6e4f7; }
+        .mb-setting-h4-right .btn-about:hover { background:#e2edfb; color:#1e3f66; border-color:#c3daf3; }
         .mb-setting-row textarea { padding:8px; }
         .mb-setting-sep { margin:10px 16px 0;padding-top:24px;border-top:1px solid var(--mb-border); }
         /* 胶囊宽度恒定：悬停不再展开任何图标，鼠标划过不会把后面的胶囊挤到第二行 */
@@ -1656,7 +1664,7 @@
             if (arr.length) Util.storage.set('mengbao.site.hosts', arr);
             else Util.storage.remove('mengbao.site.hosts');
             mask.remove();
-            mbToast('白名单已保存，刷新后生效', 2000, 'success');
+            mbToast('白名单已保存，刷新后生效（其它已打开的页面也要刷新）', 2400, 'success');
         };
     }
 
@@ -1777,7 +1785,7 @@
             const showSingle = (idx) => {
                 if (!Util.storage.get('mengbao.gallery.hintShown', false)) {
                     Util.storage.set('mengbao.gallery.hintShown', true);
-                    Util.toast('💡 滚轮切换图片 · Ctrl+滚轮缩放 · 放大后可拖动 · 双击图片或点顶部条退出 · Esc 也可关闭', 4000, 'kantu');
+                    Util.toast('💡 滚轮切换图片 · Ctrl+滚轮缩放（放大后可拖动）· 双击图片或点顶部条退出 · Esc 也可关闭', 4000, 'kantu');
                 }
                 currentIdx = (idx + imgArr.length) % imgArr.length;
                 // 切换图片时，先显示加载中，隐藏大图
@@ -2144,8 +2152,16 @@
         requestQueue: [], queueRunning: false,
         _lastScanCount: 0, _loadDone: 0, _loadTotal: 0, _checkDoneTimer: null,
         _pageDone: false, _countedTids: new Set(),
+        // 完成数按 tid 去重：原先每完成一个队列任务就 ++，同一帖重入队或上一轮残留任务会把分子顶过分母（278/270 就是这么来的）
+        _doneTids: new Set(), _epoch: 0,
+        _failedTids: new Set(),          // 本次会话里加载失败的帖子：不再自动重试，只等用户手动点 [重试]
         _continuous: false, _doneToastShown: false, _listObserver: null, _obsTimer: null,
 
+        _markDone(tid) {
+            if (!tid || this._doneTids.has(tid)) return;
+            this._doneTids.add(tid);
+            this._loadDone = this._doneTids.size;
+        },
         _memCacheSet(tid, entry) {
             if (this.loadedPostCache.has(tid)) this.loadedPostCache.delete(tid);
             this.loadedPostCache.set(tid, entry);
@@ -2331,14 +2347,13 @@
                 if (!this._countedTids.has(tid)) { this._countedTids.add(tid); count++; }
                 const cached = this._cacheStore.data[tid];
                 // 缓存命中直接渲染、不走请求队列，完成数要同步计入，否则分母含它、分子不含它
-                if (cached) { this.renderCachedPreview(tbody, tid, cached.title, cached.imgs); this._loadDone++; return; }
-                // 残留失败行：清掉并直接重试（data-mb-empty 的"本帖无图片"行保留不动）
+                if (cached) { this.renderCachedPreview(tbody, tid, cached.title, cached.imgs); this._markDone(tid); return; }
+                // 失败过的帖子直接跳过，失败行原样保留：
+                // 权限帖（阅读权限 100 这类）永远拿不到正文，自动重试会和 listObserver 形成死循环
+                // （插失败行→DOM 变化→observer 重扫→删行重试→再失败→再插行…），重试权交回用户
+                if (this._failedTids.has(tid)) return;
                 const oldRow = document.getElementById(CONST.PREVIEW_ID_PREFIX + tid);
-                if (oldRow && oldRow.dataset.mbFailed === '1') {
-                    oldRow.remove();
-                    this.loadThreadPreview(tbody, tid, title);
-                    return;
-                }
+                if (oldRow && oldRow.dataset.mbFailed === '1') return;
                 tbody.dataset.mbTid = tid;
                 tbody.dataset.mbTitle = title;
                 Lazy.observePost(tbody, (el) => { if (this._stopped) return; this.loadThreadPreview(el, tid, title); });
@@ -2372,14 +2387,11 @@
                 if (!this._countedTids.has(tid)) { this._countedTids.add(tid); count++; }
                 const rowAnchor = a.closest('li, dl, div.item, div.threadlist, div.thread, tr') || a.parentElement;
                 const cached = this._cacheStore.data[tid];
-                if (cached) { this.renderCachedPreview(rowAnchor, tid, cached.title, cached.imgs); this._loadDone++; return; }
-                // 残留失败行：清掉并直接重试
+                if (cached) { this.renderCachedPreview(rowAnchor, tid, cached.title, cached.imgs); this._markDone(tid); return; }
+                // 失败过的帖子跳过，失败行保留（原因同 scanThreads：自动重试会与 observer 死循环）
+                if (this._failedTids.has(tid)) return;
                 const oldRow = document.getElementById(CONST.PREVIEW_ID_PREFIX + tid);
-                if (oldRow && oldRow.dataset.mbFailed === '1') {
-                    oldRow.remove();
-                    this.genericLoadPreview(rowAnchor, tid, title);
-                    return;
-                }
+                if (oldRow && oldRow.dataset.mbFailed === '1') return;
                 a.dataset.mbTid = tid;
                 a.dataset.mbTitle = title;
                 Lazy.observePost(a, (el) => { if (this._stopped) return; this.genericLoadPreview(el, tid, title); });
@@ -2404,7 +2416,7 @@
         //      处理完统一释放 processingTids，单任务异常隔离
         _requestPreview(url, tid, onOk, onFail) {
             this.processingTids.add(tid);
-            this.enqueueRequest(() => Util.httpGet(url).then(
+            const task = () => Util.httpGet(url).then(
                 (html) => {
                     try {
                         const doc = Util.parseHtml(html);
@@ -2428,7 +2440,9 @@
                     }
                     this.processingTids.delete(tid);
                 }
-            ));
+            );
+            task.__tid = tid; task.__epoch = this._epoch;
+            this.enqueueRequest(task);
         },
         loadThreadPreview(tbody, tid, postTitle) {
             if (this.loadedPostCache.has(tid) || this.processingTids.has(tid)) return;
@@ -2462,10 +2476,12 @@
                     retryBtn.onclick = (e) => {
                         e.stopPropagation();
                         wrap.remove();
+                        this._failedTids.delete(tid);
                         this.loadThreadPreview(tbody, tid, postTitle);
                     };
                     tdWrap.appendChild(retryBtn);
                     wrap.dataset.mbFailed = '1';
+                    this._failedTids.add(tid);
                     tbody.after(wrap);
                     this._syncRowHidden(tbody, wrap, tid);
                 });
@@ -2502,10 +2518,12 @@
                     retryBtn.onclick = (e) => {
                         e.stopPropagation();
                         wrap.remove();
+                        this._failedTids.delete(tid);
                         this.genericLoadPreview(anchor, tid, postTitle);
                     };
                     tdWrap.appendChild(retryBtn);
                     wrap.dataset.mbFailed = '1';
+                    this._failedTids.add(tid);
                     if (anchor.tagName === 'LI') anchor.appendChild(wrap); else anchor.after(wrap);
                     this._syncRowHidden(anchor, wrap, tid);
                 });
@@ -2576,7 +2594,11 @@
                     await Promise.all(batch.map(fn => Promise.race([
                         fn().catch(() => {}),
                         new Promise(resolve => setTimeout(resolve, CONST.QUEUE_TASK_TIMEOUT))
-                    ]).then(() => { this._loadDone++; })));
+                    ]).then(() => {
+                        // 上一轮遗留的任务（停止后又开启）不计入本轮进度，否则分子会凭空多出来
+                        if (fn.__epoch !== undefined && fn.__epoch !== this._epoch) return;
+                        if (fn.__tid) this._markDone(fn.__tid);
+                    })));
                 }
             } finally {
                 this.queueRunning = false;
@@ -2632,6 +2654,8 @@
             this._doneToastShown = false;
             this._pageDone = false;
             this._countedTids = new Set();
+            this._doneTids = new Set();
+            this._epoch++;                       // 轮次 +1：上一轮未完成的任务完成时不再计入
             this._loadDone = 0; this._loadTotal = 0;
             Lazy._forceAll = true;
             const total = this.scanCurrentPage();
@@ -2648,11 +2672,13 @@
             this._checkDoneTimer = setInterval(() => {
                 const done = this._loadDone;
                 if (done !== lastDone) { lastDone = done; idleSince = Date.now(); stallHandled = false; }
-                if (done > 0 && !this._pageDone) Util.showLoading(`正在加载图片 ${done}/${this._loadTotal}…`);
+                // 分母取实时识别到的帖子数，分子按 tid 去重，两者同口径，不会再出现 278/270
+                const known = this._countedTids.size;
+                if (done > 0 && !this._pageDone) Util.showLoading(`正在加载图片 ${done}/${known}…`);
                 if (Date.now() - loadingStart < CONST.LOADING_MIN_SHOW_MS) return;
                 // 队列与 tid 都清空 = 正常收尾；计数追平总数也算收尾（_loadTotal 可能比实际可入队任务多算）
                 const queueIdle = !this.queueRunning && this.requestQueue.length === 0 && this.processingTids.size === 0;
-                const countMatched = this._loadTotal > 0 && done >= this._loadTotal && !this.queueRunning;
+                const countMatched = known > 0 && done >= known && !this.queueRunning;
                 if (queueIdle || countMatched) {
                     if (this._pageDone) return;      // 已收尾，等翻页新增把 _pageDone 置回 false
                     // 提示条无条件收掉：原先 hideLoading 只写在 _doneToastShown 首次为 false 的分支里，
@@ -2682,7 +2708,7 @@
                             queue: this.requestQueue.length, processing: stuck, queueRunning: this.queueRunning
                         });
                     }
-                    const left = Math.max(0, this._loadTotal - this._loadDone);
+                    const left = Math.max(0, this._countedTids.size - this._loadDone);
                     this.requestQueue.length = 0;
                     // 清残留 tid 顺带修掉「点[重试]没反应」：重试入口的卫语句会把残留 tid 直接 return 掉
                     this.processingTids.clear();
@@ -2703,6 +2729,7 @@
             this.processingTids.clear();
             this._loadDone = 0; this._loadTotal = 0;
             this._countedTids = new Set();
+            this._doneTids = new Set();
             this._pageDone = false;
             Lazy._forceAll = false;
             if (this._checkDoneTimer) { clearInterval(this._checkDoneTimer); this._checkDoneTimer = null; }
@@ -2876,7 +2903,7 @@
                     appended = afterRows - beforeRows;
                     if (appended > 0) {
                         this._failCount = 0;
-                        this._currentPage++;
+                        this._currentPage = targetPage;
                         if (this._pageLabel) { this._pageLabel.textContent = `共 ${this._currentPage} 页`; this._pageLabel.style.display = ''; }
                         Util.toast(`已加载成功一页，新增 ${appended} 个用户`, 2000, 'fanye');
                     } else {
@@ -2912,7 +2939,7 @@
                 });
                 if (appended > 0) {
                     this._failCount = 0;
-                    this._currentPage++;
+                    this._currentPage = targetPage;
                     if (this._pageLabel) { this._pageLabel.textContent = `共 ${this._currentPage} 页`; this._pageLabel.style.display = ''; }
                     Util.toast(`已自动加载 ${appended} 个新帖到当前页`, 2000, 'fanye');
                     // 追加后联动：搜索页同步板块筛选（看图不自动扫，等用户点球）
@@ -3136,7 +3163,7 @@
             if (this.fab && this.fab.el) {
                 this.fab.el.classList.add('mb-fab--guolv');
                 const gBtn = this.fab.el.querySelector('.mb-fab-btn');
-                if (gBtn) gBtn.title = '🎯 左键：打开板块过滤面板 ｜ 右键：过滤与屏蔽设置 ｜ 拖拽：移动位置';
+                if (gBtn) gBtn.title = '🎯 左键：打开板块过滤面板 ｜ 右键：屏蔽词设置 ｜ 拖拽：移动位置';
             }
             const tl = document.querySelector('#threadlist');
             if (tl && isSearchResultPage()) tl.classList.add('mb-search-card');
@@ -3704,7 +3731,7 @@
                 Util.httpPost(`home.php?mod=spacecp&ac=favorite&op=delete&favid=${favoriteId}&type=all&inajax=1`, postData).then(() => {
                     delete this.favoriteThreads[tid]; this.saveFavoriteThreads();
                     btn.classList.remove('mb-active');
-                    Util.toast('已取消收藏', 1500, 'favorite');
+                    Util.toast('已取消收藏该帖', 1500, 'favorite');
                 }).catch(() => Util.toast('取消收藏失败，请稍后再试', 1500, 'error')).finally(() => {
                     this._favoriteBusy = false;
                     btn.classList.remove('mb-fab-loading');
@@ -3718,7 +3745,7 @@
                 // 收藏成功，标记为已收藏（存 1 占位，真实 favoriteId 由后台同步补齐）
                 this.favoriteThreads[tid] = 1; this.saveFavoriteThreads();
                 btn.classList.add('mb-active');
-                Util.toast('收藏成功', 1500, 'favorite');
+                Util.toast('已收藏该帖', 1500, 'favorite');
                 //（同步与取消共用同一个防重入 Promise，取消时若同步未完成会等待其完成）
                 this.readFavorRecords(true);
             }).catch(() => Util.toast('收藏失败，请稍后再试', 1500, 'error')).finally(() => {
@@ -4016,12 +4043,15 @@
             <div class="mb-setting-section">
                 <h4 class="mb-setting-h4">
                     <span><span class="icon">⚙️</span>通用设置</span>
-                    <span class="mb-setting-h4-right btn-help" title="重新查看新手上手引导卡片（四个球的职责与手势说明）">📖 使用帮助</span>
+                    <span class="mb-setting-h4-right">
+                        <span class="btn-help" title="重新查看快速上手引导（四个球的用法、已读标记、窄屏）">📖 使用帮助</span>
+                        <span class="btn-about" title="查看脚本版本、仓库与使用指南地址">ℹ️ 关于</span>
+                    </span>
                 </h4>
                 <div class="mb-setting-grid">
                     <div class="mb-setting-row">
-                        <label title="开启后把论坛版心压到 960（旧版宽度）。只在论坛「窄」档生效，切到全屏档会自动放开；切换后建议刷新一次页面让分页等信息重新排布">窄屏模式${Date.now() <= new Date('2026-11-24T23:59:59+08:00').getTime() ? '<span class="mb-new-badge">新</span>' : ''}：</label>
-                        <input type="checkbox" class="set-narrow-enabled mb-setting-checkbox" ${Util.storage.get('mengbao.narrow.enabled', false) ? 'checked' : ''} style="cursor:pointer;" title="把论坛版心压到 960（旧版宽度），仅在窄档生效">
+                        <label title="开启后把论坛版心压到 960（旧版宽度）。只作用于版块列表、导读、帖子、搜索页；首页、个人中心、勋章、排行榜保持论坛原样。只在论坛「窄」档生效，切到全屏档会自动放开；切换后建议刷新一次页面让分页等信息重新排布">窄屏模式${Date.now() <= new Date('2026-11-24T23:59:59+08:00').getTime() ? '<span class="mb-new-badge">新</span>' : ''}：</label>
+                        <input type="checkbox" class="set-narrow-enabled mb-setting-checkbox" ${Util.storage.get('mengbao.narrow.enabled', false) ? 'checked' : ''} style="cursor:pointer;" title="把论坛版心压到 960（旧版宽度），只作用于版块列表、导读、帖子、搜索页，且仅在窄档生效">
                     </div>
                     <div class="mb-setting-row">
                         <label title="浏览过的帖子怎么标记：关闭 / 变灰并划线 / 只变灰不划线">已读帖子：</label>
@@ -4699,19 +4729,25 @@
     // ===================== 全量配置导出 / 导入 =====================
     // 备份集合由 schema 的 backup 标记生成，不再维护硬编码键列表
     const collectBackupKeys = () => Cfg.backupKeys();
+    // 已下线功能的设置键（内置头像、评论面板收藏）：导入时忽略，不阻断整批导入
+    const LEGACY_BACKUP_KEYS = ['mengbao.avatar.builtinDeleted', 'mengbao.comment.favorite'];
     function bindFullBackup(container) {
         const exportBtn = container.querySelector('.btn-export-all');
         if (exportBtn) {
             exportBtn.onclick = () => {
                 const payload = {};
-                collectBackupKeys().forEach(k => { payload[k] = Util.storage.get(k, null); });
+                // 只写真正设置过的键：未设置的键不写 null，导出的 JSON 更干净，回导也不会被当成脏键
+                collectBackupKeys().forEach(k => {
+                    const v = Util.storage.get(k, null);
+                    if (v !== null && v !== undefined) payload[k] = v;
+                });
                 const ver = (typeof GM_info !== 'undefined' && GM_info.script) ? GM_info.script.version : 'unknown';
                 const text = JSON.stringify({ version: ver, exportedAt: Date.now(), data: payload }, null, 2);
                 const modal = openModal({
                     width: 'sm',
                     body: `
                     <div class="mb-dialog-title">导出全量配置</div>
-                    <div class="mb-dialog-sub">包含参数、收藏、评分、收藏用户与站点白名单（不含悬浮球位置与看图临时缓存）：</div>
+                    <div class="mb-dialog-sub">只包含当前设置过的项：参数、收藏、评分、收藏用户与站点白名单（不含悬浮球位置、看图临时缓存与已读历史）：</div>
                     <textarea class="mb-modal-textarea mb-dialog-textarea h-180 mb-input-base" readonly>${Util.escapeTextarea(text)}</textarea>
                     <div class="mb-dialog-actions">
                         <button class="mb-btn-copy mb-btn mb-btn-primary">复制</button>
@@ -4732,7 +4768,7 @@
                     closeOnMaskClick: false,
                     body: `
                     <div class="mb-dialog-title">导入全量配置</div>
-                    <div class="mb-dialog-sub">粘贴之前导出的全量配置 JSON，将与当前配置合并覆盖（非法键自动跳过）：</div>
+                    <div class="mb-dialog-sub">粘贴之前导出的全量配置 JSON，将与当前配置合并覆盖；旧版本已下线的设置会自动忽略，其余无法识别的键会取消本次导入：</div>
                     <textarea class="mb-import-all-text mb-modal-textarea mb-dialog-textarea h-180 mb-input-base"></textarea>
                     <div class="mb-dialog-actions">
                         <button class="mb-btn-cancel mb-btn mb-btn-secondary">取消</button>
@@ -4750,11 +4786,15 @@
                         const allow = new Set(collectBackupKeys());
                         const backup = {};
                         allow.forEach(k => { backup[k] = Util.storage.get(k, null); });
-                        // 只接受 schema 登记且校验通过的备份键，未知键一律拒绝
-                        let applied = 0; const skipped = [];
+                        // 只接受 schema 登记且校验通过的备份键；历史版本已下线的键直接忽略，其余未知键一律拒绝
+                        let applied = 0; const skipped = []; const ignored = [];
                         Object.keys(data).forEach(k => {
-                            if (!allow.has(k)) { skipped.push(k); return; }
-                            if (data[k] === undefined) return;
+                            if (!allow.has(k)) {
+                                if (LEGACY_BACKUP_KEYS.indexOf(k) > -1) ignored.push(k); else skipped.push(k);
+                                return;
+                            }
+                            // 旧版导出会把未设置的键写成 null：跳过而不参与校验，否则会被误判为“无法识别”并整批取消
+                            if (data[k] === undefined || data[k] === null) return;
                             if (!Cfg.validate(k, data[k])) { skipped.push(k); return; }
                             if (USER_STORE_KEYS.includes(k) && Util.userStore.isOldStyle(k, data[k])) {
                                 Util.userStore.setFor(k, Util.userStore.curBucket(), data[k]);
@@ -4770,11 +4810,11 @@
                                 else Util.storage.set(k, backup[k]);
                             });
                             modal.close();
-                            Util.toast('检测到不支持的配置项，已跳过：' + skipped.map(k => k.replace('mengbao.', '')).join(', '), 2000, 'error');
+                            Util.toast('检测到无法识别的配置项（' + skipped.map(k => k.replace('mengbao.', '')).join(', ') + '），本次导入已整体取消，原配置未变', 3000, 'error');
                             return;
                         }
                         modal.close();
-                        Util.toast('导入成功 ' + applied + ' 项，刷新后生效', 2000, 'success');
+                        Util.toast('导入成功 ' + applied + ' 项' + (ignored.length ? '，忽略 ' + ignored.length + ' 个过期设置' : '') + '，刷新后生效', 2600, 'success');
                     } catch (e) {
                         Util.toast('导入失败：' + e.message, 2000, 'error');
                     }
@@ -5184,6 +5224,27 @@
         maskEl.addEventListener('mousedown', (e) => { if (e.target === maskEl) saveAvatarDialog(); });
     }
 
+        function openAboutDialog() {
+            const ver = (typeof MB_VERSION !== 'undefined' && MB_VERSION) ? MB_VERSION : 'unknown';
+            const modal = openModal({
+                width: 'sm',
+                body: `
+                <div class="mb-dialog-title">关于 萌宝小秘书</div>
+                <div class="mb-dialog-sub" style="line-height:2;">
+                    <div>版本：v${Util.escapeHtml(String(ver))}</div>
+                    <div>作者：Slient_桃萌</div>
+                    <div>仓库：github.com/mengbao-tools/mengbao-xiaomishu</div>
+                    <div>使用指南：mengbao-tools.github.io/mengbao-xiaomishu/guide.html</div>
+                    <div style="margin-top:10px;font-size:var(--mb-font-sm);">MIT License · 所有数据都存在本地浏览器</div>
+                </div>
+                <div class="mb-dialog-actions">
+                    <button class="mb-btn-close mb-btn mb-btn-primary">关闭</button>
+                </div>`
+            });
+            const closeBtn = modal.query('.mb-btn-close');
+            if (closeBtn) closeBtn.onclick = () => modal.close();
+        }
+
         function openGmSettingDialog() {
         const modal = openModal({
             width: 'md', extraClass: 'mb-modal-box--setting',
@@ -5218,6 +5279,8 @@
             modal.close();
             setTimeout(() => { try { showFirstRunGuideIfNeeded(true); } catch (e) {} }, 260);
         };
+        const aboutBtn = modal.query('.btn-about');
+        if (aboutBtn) aboutBtn.onclick = () => { try { openAboutDialog(); } catch (e) {} };
         const openFavBtn = modal.query('.btn-open-fav-gallery');
         if (openFavBtn) openFavBtn.onclick = () => openFavGallery();
         modal.query('.btn-reset-pos').onclick = () => {
@@ -5374,9 +5437,11 @@
             const m = location.href.match(/[?&]do=([a-z]+)/i);
             if (!m) return true;                                  // home.php?mod=space&uid=x
             // view=me 是自己名下的列表页（我的帖子 / 我的收藏 / 我的好友…），不是谁的资料页。
-            // 这类页面里同样找得到指向自己 uid 的用户名链接，之前会被当成资料页、
+            // 这类页面里同样找得到指向自己 uid 的用户名链接，会被误当成资料页，
             // 把收藏星标挂到顶部用户名容器上，于是页面最上方凭空多出一个星星。
-            if (/[?&]view=me\b/.test(location.href)) return false;
+            // 带 uid 的 view=me 是"看某人的主题/回复列表"（Discuz 从资料页点标签就跳这里），
+            // 仍属该用户的空间页，星标要挂；只有不带 uid 的纯 view=me（自己的列表页）才排除
+            if (/[?&]view=me\b/.test(location.href) && !/[?&]uid=\d+/.test(location.href)) return false;
             return /^(profile|thread)$/.test(m[1].toLowerCase());  // 资料页 / 个人主题页
         };
         // 取当前资料页用户的 uid：URL 有就用，没有就从 #uhd 里带 uid 的链接反查
@@ -5392,14 +5457,23 @@
             }
             return null;
         };
-        // 用户名挂载点：只取正文里指向该 uid 的用户名链接，绝不再挂到顶部导航 #uhd
-        // 找不到就返回 null —— 宁可不挂，也不挂错位置
+        // 用户名挂载点：优先资料页顶部用户名栏 #uhd .mt（头像右侧），星标挂这里才看得见；
+        // 找不到时退回正文里指向该 uid 的用户名链接（排除面包屑、导航、顶栏条、分页），
+        // 否则星标会落进“统计信息 / 回帖数”那类小字行里，等同消失
         const findProfileNameEl = () => {
+            const mt = document.querySelector('#uhd .mt');
+            if (mt) return mt;
             const uid = getProfileUid();
             if (!uid) return null;
+            const SKIP = '#uhd,#pt,.nv,#nv,#toptb,.pg,.pgs,.mb-panel';
             const links = Array.from(document.querySelectorAll('a[href*="uid=' + uid + '"], a[href*="space-uid-' + uid + '"]'));
-            const hit = links.find(a => !(a.closest && a.closest('#uhd')) && (a.textContent || '').trim() && !a.querySelector('img'));
-            return hit ? (hit.parentElement || hit) : null;
+            const ok = links.filter(a => {
+                if (a.closest && a.closest(SKIP)) return false;
+                if (a.querySelector('img')) return false;
+                return !!(a.textContent || '').trim();
+            });
+            if (!ok.length) return null;
+            return ok[0].parentElement || ok[0];
         };
         // 给一个用户名容器挂按钮：mode=floor/list/profile
         const attachBtn = (userInfo, mode) => {
@@ -5419,14 +5493,36 @@
                 const uid = getProfileUid();
                 if (!uid) return;
                 // 自己的资料页不挂星标（取顶部导航里自己的 uid 做比对）
-                const mine = (() => { const box = document.querySelector('#uhd'); if (!box) return null; const a = box.querySelector('a[href*="mod=space&uid="], a[href*="space-uid-"]'); if (!a) return null; const h = a.getAttribute('href') || ''; const mm = h.match(/uid=(\d+)/) || h.match(/space-uid-(\d+)/); return mm ? mm[1] : null; })();
-                if (mine && uid === mine) return;
+                // 取当前登录 uid 走统一来源（discuz_uid→页头→内联脚本→导航区→cookie 多级兜底）；
+                // 不能从 #uhd 取第一个 uid 链接：资料页上那指向的是“被查看的人”，会把别人资料页误判成自己主页、星标一律不挂
+                const mine = currentUserId();
+                if (mine > 0 && Number(uid) === mine) return;
                 const nameText = userInfo.textContent.split('\n').map(s => s.trim()).find(s => s && !/^https?:/.test(s) && !/加为好友|发送消息/.test(s));
                 const username = nameText || uid;
                 updateHighlight(userInfo, uid);
                 if (userInfo.querySelector('[data-mb-favoriteuid]')) return;
                 userInfo.appendChild(buildBtn(uid, username, mode));
             }
+        };
+        // 按 uid 刷新页面上的作者名颜色。
+        // 楼层（.authi）与评论侧栏（.mb-comment-user）里的用户名不一定包在 cite 中，
+        // 所以按「容器 + 第一个 uid 链接」取，比对 uid 命中才染色；
+        // 只染名字本身，避免把「发消息 / 加为好友 / 主题 tab」这类同类链接一起染蓝。
+        const paintAuthorsFor = (uid) => {
+            if (!uid) return;
+            const want = String(uid);
+            const paint = (box) => {
+                if (!box) return;
+                const a = box.querySelector('a[href*="uid="]');
+                if (!a) return;
+                const m = (a.getAttribute('href') || '').match(/uid=(\d+)/);
+                if (m && m[1] === want) updateHighlight(a, want);
+            };
+            document.querySelectorAll('table[id^=pid] .authi').forEach(paint);              // 帖子楼层
+            document.querySelectorAll('#mb-comment-app .mb-comment-user').forEach(paint);   // 评论侧栏
+            document.querySelectorAll('td.by').forEach(paint);                              // 版块列表作者列
+            document.querySelectorAll('#threadlist .pbw').forEach(paint);                   // 搜索结果行
+            document.querySelectorAll('#uhd .mt').forEach(el => updateHighlight(el, want)); // 资料页用户名（纯文本 h2）
         };
         // 初始扫描
         document.querySelectorAll('table[id^=pid]').forEach(row => {
@@ -5478,16 +5574,7 @@
             }
             favoriteUsers = fu;
             if (highlightTarget) updateHighlight(highlightTarget, uid);
-            // 否则个人资料页的「主题 / 个人资料」tab、发消息、加为好友等链接会被一起染色（刷新才恢复）
-            [
-                '#uhd .mt',                                                        // 个人资料页用户名
-                `table[id^=pid] .authi cite a[href*="uid=${uid}"]`,                 // 帖子楼层作者
-                `td.by cite a[href*="uid=${uid}"]`,                                 // 列表页作者
-                `#threadlist .pbw .xs3 a[href*="uid=${uid}"]`,                      // 搜索页作者
-                `#threadlist .pbw h3 a[href*="uid=${uid}"]`
-            ].forEach(sel => {
-                document.querySelectorAll(sel).forEach(el => updateHighlight(el, uid));
-            });
+            paintAuthorsFor(uid);
             // 实时更新列表页的收藏用户高亮
             highlightAllFavUserThreads();
             window.dispatchEvent(new CustomEvent('mengbao:favorite-changed', { detail: { uid, username, on: !!fu[uid], from: 'floor' } }));
@@ -5502,6 +5589,7 @@
             Util.userStore.set('mengbao.zengqiang.favorite_users', fu);
             favoriteUsers = fu;
             syncAll(d.uid, d.username || d.uid, fu);
+            paintAuthorsFor(d.uid);
         });
 
         // 收藏馆里增删用户后，重刷页面上所有星星（数据源只有一个，避免两边快照打架）
@@ -5515,6 +5603,7 @@
                 btn.classList.toggle('mb-favorite-off', !on);
                 btn.title = on ? '取消收藏该用户' : '收藏该用户';
             });
+            Object.keys(all).forEach(u => paintAuthorsFor(u));
             highlightAllFavUserThreads();
         });
 
@@ -5559,11 +5648,23 @@
         });
     }
 
+    // 楼层锚点跳转补偿：站点顶部 #nv 是常驻吸顶（实测 33px），原生锚点会把目标楼层顶边对齐到视口顶边，
+    // 结果头像和用户名被红条盖住。这里把 #nv 的实测高度 + 8px 写进 CSS 变量，由 scroll-margin-top 消费，
+    // 换分辨率或页面缩放都不用手调。
+    function syncAnchorOffset() {
+        const nv = document.querySelector('#nv');
+        const h = nv ? Math.round(nv.getBoundingClientRect().height) : 0;
+        document.documentElement.style.setProperty('--mb-anchor-offset', (h > 0 ? h + 8 : 41) + 'px');
+    }
+    window.addEventListener('load', () => syncAnchorOffset());
+    window.addEventListener('resize', () => syncAnchorOffset());
+
     // ===================== 主入口 =====================
     function main() {
         injectStyle();
+        syncAnchorOffset();
         moduleSortByDateline();
-        GM_registerMenuCommand('设置', openGmSettingDialog);
+        GM_registerMenuCommand('设置（v' + MB_VERSION + '）', openGmSettingDialog);
         if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', startModules);
         else startModules();
     }
@@ -5630,7 +5731,7 @@
             card.className = 'mb-guide-card' + (force ? ' mb-guide-card--center' : '');
             card.innerHTML = ''
                 + '<div class="mb-guide-title">📖 ' + Util.escapeHtml(Util.userStore.get('mengbao.panel.nickname', '萌宝')) + ' · 快速上手</div>'
-                + '<div class="mb-guide-row">🎯 过滤球：左键打开板块过滤面板 ｜ 右键过滤/屏蔽设置</div>'
+                + '<div class="mb-guide-row">🎯 过滤球：左键打开板块过滤面板 ｜ 右键屏蔽词设置</div>'
                 + '<div class="mb-guide-row">📄 翻页球：左键加载一页 ｜ 右键切换持续加载</div>'
                 + '<div class="mb-guide-row">🖼️ 看图球：左键开启图片预览 ｜ 右键停止加载并收起（缓存保留）</div>'
                 + '<div class="mb-guide-row">⚡ 增强球：左键功能面板（画廊/收藏/评分…）｜ 右键评论面板</div>'
@@ -5823,6 +5924,11 @@
         .mb-comment-basic { display:flex; justify-content:space-between; color:var(--mb-text-muted); }
         .mb-comment-meta { justify-content:space-between; gap:8px; align-items:center; }
         .mb-comment-user a { color:var(--mb-text-muted); font-weight:normal; }
+        /* 侧栏里已收藏的用户名必须能压过上面的弱化色 */
+        .mb-comment-user a.mb-favorite-user-author { color:var(--mb-accent) !important; font-weight:bold !important; }
+        /* 楼层锚点跳转：站点 #nv 常驻吸顶会盖住目标楼层，用 scroll-margin-top 让出一截；
+           --mb-anchor-offset 由脚本按 #nv 实测高度注入，不写死 */
+        div[id^="post_"], table[id^="pid"] { scroll-margin-top: var(--mb-anchor-offset, 41px); }
         .mb-comment-content { padding:6px 0; color:var(--mb-text-primary); font-size:var(--mb-font-md); max-height:390px; overflow:auto; }
         .mb-comment-content img { max-width:100%; height:auto; }
         .mb-comment-content img[smilieid] { max-width:20px; }
@@ -5995,12 +6101,19 @@
                         avatar = `<img src="${escAttr(bigSrc)}" alt=""${onErr ? ' onerror="' + onErr + '"' : ''}>`;
                     }
                     const authi = c.querySelector('.authi');
-                    let user = authi ? authi.innerHTML : '<span>匿名</span>';
                     let uid = '', username = '';
                     if (authi) {
                         const ua = authi.querySelector('a[href*="uid="]');
-                        if (ua) { const m = ua.href.match(/uid=(\d+)/); if (m) uid = m[1]; username = ua.textContent.trim(); }
+                        if (ua) {
+                            const m = ua.href.match(/uid=(\d+)/);
+                            if (m) uid = m[1];
+                            username = ua.textContent.trim();
+                            // 已收藏的用户名要带着高亮 class 一起渲染：追加加载的评论不走 paintAuthorsFor，
+                            // 只在渲染时带上，否则会出现「星标实心、名字原色」
+                            if (uid && favoriteUsers[uid]) ua.classList.add('mb-favorite-user-author');
+                        }
                     }
+                    let user = authi ? authi.innerHTML : '<span>匿名</span>';
                     if (uid && !user.includes('data-mb-favoriteuid')) {
                         const isOn = !!favoriteUsers[uid];
                         const starPath = 'M12 2l2.9 6.26 6.6.57-5 4.36 1.5 6.51L12 16.9 5.99 19.7l1.5-6.51-5-4.36 6.6-.57z';
@@ -6145,7 +6258,33 @@
             const replyEl = Array.from(document.querySelectorAll('.hm .xi1'))[1];
             const replyText = replyEl ? replyEl.innerText : null;
             let parsed = replyText != null ? parseInt(replyText) : NaN;
-            this.totalComments = !isNaN(parsed) ? parsed : this.totalPages * 10;
+            const hasReplyCount = !isNaN(parsed) && parsed > 0;
+            this.totalComments = hasReplyCount ? parsed : this.totalPages * 10;
+            // 部分站点分页字段有脏数据，会把别的数字当总页数（如 52 条评论却标 5 万页）。
+            // 判据只用必然关系：页数不可能超过回复数（每页至少 1 楼）。超出就按回复数重算，
+            // 不用固定阈值兜底——真有 200 页的帖子必然有 200 条以上回复，不会进来。
+            if (hasReplyCount && this.totalPages > this.totalComments) {
+                const rawPages = this.totalPages;
+                const rawComments = this.totalComments;
+                // 每页按论坛常见的 10 楼算，+1 是楼主那一楼，避免 10、20、30 这类边界少算一页
+                this.totalPages = Math.max(1, Math.ceil((this.totalComments + 1) / 10));
+                // 兜底触发即留证：不依赖调试开关，独立存放，不进配置表、不参与导入导出
+                try {
+                    const DIAG_KEY = 'mengbao.diag.pagerAnomaly';
+                    let arr = Util.storage.get(DIAG_KEY, []);
+                    if (!Array.isArray(arr)) arr = [];
+                    const tidM = location.href.match(/[?&]tid=(\d+)/) || location.href.match(/thread-(\d+)/);
+                    arr.unshift({
+                        t: Date.now(),
+                        tid: tidM ? tidM[1] : '',
+                        rawPages: rawPages,
+                        rawComments: rawComments,
+                        fixedPages: this.totalPages,
+                        url: location.href.split('#')[0],
+                    });
+                    Util.storage.set(DIAG_KEY, arr.slice(0, 20));
+                } catch (e) { }
+            }
             // 暴露全局接口给左侧增强球右键调用
             const self = this;
             window.MengbaoCommentPanel = {
