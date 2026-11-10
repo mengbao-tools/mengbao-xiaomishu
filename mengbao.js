@@ -9,7 +9,7 @@
 // ==UserScript==
 // @name         萌宝小秘书
 // @namespace    https://violentmonkey.mengbao.local/
-// @version      1.1
+// @version      1.2
 // @description  Discuz 论坛增强套件：图片画廊预览、大图查看器、搜索过滤、自动翻页、收藏用户与帖子、评论侧边面板、评分自动满分、浏览历史标记、自定义头像
 // @author       Slient_桃萌
 // @icon         https://aka.doubaocdn.com/s/ZHcpkVi54s
@@ -91,6 +91,14 @@
         if (typeof v !== 'object' || v === null || Array.isArray(v)) return false;
         return Object.values(v).every(x => check(x));
     };
+    // v1.2 起移除「收藏关键词」功能：清掉历史残留键，避免死数据留在本地
+    try {
+        if (typeof GM_deleteValue === 'function') {
+            GM_deleteValue('mengbao.comment.favorite');
+            GM_deleteValue('mengbao.comment.keywordStats');
+        }
+    } catch (e) {}
+
     const CONFIG_SCHEMA = {
         'mengbao.sort.config':               { type: 'object',   def: { enabled: true }, backup: true },
         'mengbao.kantu.config':              { type: 'object',   def: { THUMB_W: 300, THUMB_H: 300, GALLERY_BG_COLOR: '#faf8f5', GALLERY_CELL_COLOR: '#f8fafc' }, backup: true },
@@ -118,9 +126,7 @@
         'mengbao.cmtfav.avatarChoice':       { type: 'string',   def: '', backup: true, validate: vOldOrNew(x => typeof x === 'string') },
         'mengbao.cmtfav.avatar':             { type: 'string',   def: '', backup: true, validate: vOldOrNew(x => typeof x === 'string' && (!x || /^(?:data:image\/|builtin:[12]$)/.test(x))) },
         'mengbao.comment.width':             { type: 'number',   def: 22, min: 15, max: 50, backup: true, validate: vOldOrNew(x => typeof x === 'number' && Number.isFinite(x)) },
-        'mengbao.comment.favorite':          { type: 'string',   def: '', backup: true, validate: vOldOrNew(x => typeof x === 'string') },
         'mengbao.comment.minLen':            { type: 'number',   def: 1, min: 1, max: 30, backup: true, validate: vOldOrNew(x => typeof x === 'number' && Number.isFinite(x)) },
-        'mengbao.comment.keywordStats':      { type: 'object',   def: {}, validate: vOldOrNew(x => !!x && typeof x === 'object' && !Array.isArray(x)) },
         'mengbao.panel.nickname':            { type: 'string',   def: '萌宝', maxLen: 64, backup: true, validate: vOldOrNew(x => typeof x === 'string' && x.length <= 64) },
         'mengbao.settings':                  { type: 'object',   def: {} },
         'mengbao.kantu.fab_pos':             { type: 'object',   def: {} },
@@ -449,8 +455,6 @@
         'mengbao.cmtfav.avatar',
         'mengbao.panel.nickname',
         'mengbao.comment.width',
-        'mengbao.comment.favorite',
-        'mengbao.comment.keywordStats',
         'mengbao.comment.minLen',
         'mengbao.kantu.fab_pos',
         'mengbao.kantu.fab_pos_fold',
@@ -839,8 +843,13 @@
         body:has(#threadlist.mb-search-card) .by,
         body:has(#threadlist.mb-search-card) .pg,
         body:has(#threadlist.mb-search-card) .pgs,
-        #threadlist.mb-search-card { max-width:1400px !important; margin:0 auto !important; float:none !important; width:100% !important; box-sizing:border-box; }
-        #threadlist.mb-search-card { padding:0 12px; }
+        /* 搜索页宽度对齐论坛版心。论坛 #wp 固定 1200，实测列表页 / 帖子页 / 首页的内容容器均为 1200，左右边界 47 / 1247；搜索页限宽同步为 1200，四页边缘重合。 */
+        /* 搜索页模板没有 #wp，外层 #ct 原生按「视口减左右各 20」撑到 1254，比版心左右各宽出 27px，因此连 #ct 一并收进版心。 */
+        /* 原值 1400 是按 1311 视口调宽的临时值，实绘会超出论坛版心 200px。实测搜索页是卡片垂直流、无表格列，收窄后标题仍正常折行，不挤压作者、分页等信息，视觉变化仅为个别长标题的折行位置。 */
+        #threadlist.mb-search-card { max-width:1200px !important; margin:0 auto !important; float:none !important; width:100% !important; box-sizing:border-box; }
+        body:has(#threadlist.mb-search-card) #ct { max-width:1200px !important; margin-left:auto !important; margin-right:auto !important; }
+        /* 卡片区去掉左右 12px 内边距，让卡片左右边缘与论坛表格完全齐平（搜索页两侧本就留有大片空白，无需再额外留白）；上下方向的外边距不变，卡片间距照旧。 */
+        #threadlist.mb-search-card { padding:0; }
         #threadlist.mb-search-card .pbw { border:1px solid rgba(128,140,150,.35) !important; border-radius:var(--mb-radius) !important; padding:12px !important; margin:0 0 12px 0 !important; background:var(--mb-bg-page) !important; float:none !important; clear:both !important; list-style:none !important; }
         #threadlist .pbw.mb-browsed,
         #threadlist.mb-search-card .pbw.mb-browsed {
@@ -912,16 +921,16 @@
         .mb-gallery-grid::-webkit-scrollbar-thumb:hover { background:var(--mb-text-hint); }
         .mb-gallery-grid::-webkit-scrollbar-track { background:transparent; }
         .mb-modal-box::-webkit-scrollbar, .mb-favorite-users-list::-webkit-scrollbar,
-        .mb-comment-scroll::-webkit-scrollbar, .mb-comment-panel-fav::-webkit-scrollbar,
+        .mb-comment-scroll::-webkit-scrollbar,
         .mb-comment-content::-webkit-scrollbar, .mb-guolv-kw-input::-webkit-scrollbar { width:8px; height:8px; }
         .mb-modal-box::-webkit-scrollbar-thumb, .mb-favorite-users-list::-webkit-scrollbar-thumb,
-        .mb-comment-scroll::-webkit-scrollbar-thumb, .mb-comment-panel-fav::-webkit-scrollbar-thumb,
+        .mb-comment-scroll::-webkit-scrollbar-thumb,
         .mb-comment-content::-webkit-scrollbar-thumb, .mb-guolv-kw-input::-webkit-scrollbar-thumb { background:var(--mb-border); border-radius:var(--mb-radius-sm); }
         .mb-modal-box::-webkit-scrollbar-thumb:hover, .mb-favorite-users-list::-webkit-scrollbar-thumb:hover,
-        .mb-comment-scroll::-webkit-scrollbar-thumb:hover, .mb-comment-panel-fav::-webkit-scrollbar-thumb:hover,
+        .mb-comment-scroll::-webkit-scrollbar-thumb:hover,
         .mb-comment-content::-webkit-scrollbar-thumb:hover, .mb-guolv-kw-input::-webkit-scrollbar-thumb:hover { background:var(--mb-text-hint); }
         .mb-modal-box::-webkit-scrollbar-track, .mb-favorite-users-list::-webkit-scrollbar-track,
-        .mb-comment-scroll::-webkit-scrollbar-track, .mb-comment-panel-fav::-webkit-scrollbar-track,
+        .mb-comment-scroll::-webkit-scrollbar-track,
         .mb-comment-content::-webkit-scrollbar-track, .mb-guolv-kw-input::-webkit-scrollbar-track { background:transparent; }
         .mb-gallery-divider { grid-column: 1 / -1; width:100%; display:flex; align-items:center; gap:12px; color:var(--mb-text-hint); font-size:var(--mb-font-md); padding:8px 0; margin:4px 0; }
         .mb-gallery-divider::before, .mb-gallery-divider::after { content:""; flex:1; height:1px; background:var(--mb-border); }
@@ -935,10 +944,12 @@
         .mb-gallery-go { position:absolute;bottom:6px;right:6px;background:rgba(255,255,255,0.85);color:var(--mb-accent-deep);font-size:var(--mb-font-sm);padding:4px 8px;border-radius:var(--mb-radius);cursor:pointer;opacity:0.85;z-index:2;display:flex;align-items:center;gap:4px;user-select:none;outline:none;backdrop-filter:blur(4px);transition:opacity var(--mb-t-fast); }
         .mb-gallery-cell:hover .mb-gallery-go { opacity:1; }
         .mb-gallery-go:hover { background:var(--mb-bg-page); }
-        .mb-single-view { position:fixed;inset:0;background:rgba(0,0,0,0.82);display:none;align-items:center;justify-content:center;z-index:var(--mb-z-single);box-sizing:border-box;padding:76px 56px 104px; }
+        /* 大图上限为内容区 100%，超大图等比缩到视口内完整可见；
+           早前 max:none 会让 1536×2048 这类原图按 1:1 溢出视口、四周被裁 */
+        .mb-single-view { position:fixed;inset:0;background:rgba(0,0,0,0.82);display:none;align-items:center;justify-content:center;z-index:var(--mb-z-single);box-sizing:border-box;padding:76px 24px 104px; }
         .mb-single-bar { position:absolute;top:0;left:0;right:0;height:52px;display:flex;align-items:center;gap:8px;padding:0 20px;box-sizing:border-box;background:linear-gradient(180deg,rgba(0,0,0,0.82) 0%,rgba(0,0,0,0.58) 58%,rgba(0,0,0,0) 100%);box-shadow:inset 0 -1px 0 rgba(255,255,255,0.08);z-index:12;cursor:pointer;transition:background var(--mb-t-base) ease; }
         .mb-single-bar:hover { background:linear-gradient(180deg,rgba(0,0,0,0.88) 0%,rgba(0,0,0,0.66) 58%,rgba(0,0,0,0) 100%); }
-        .mb-single-view img { max-width:none;max-height:none;flex:none;object-fit:contain;z-index:1;cursor:default;transition:transform var(--mb-t-base) ease;user-select:none;-webkit-user-drag:none; }
+        .mb-single-view img { max-width:100%;max-height:100%;width:auto;height:auto;flex:none;object-fit:contain;z-index:1;cursor:default;transition:transform var(--mb-t-base) ease;user-select:none;-webkit-user-drag:none; }
         .mb-single-loading { position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); color:var(--mb-text-on-accent); z-index:2; }
         .mb-single-loading::before { content:''; display:inline-block; width:40px; height:40px; border:3px solid var(--mb-text-on-accent); border-top-color:transparent; border-radius:50%; animation:mb-spin 0.8s linear infinite; margin-right:12px; vertical-align:middle; }
         .mb-single-slow { display:none; margin-left:12px; vertical-align:middle; font-size:var(--mb-font-md); white-space:nowrap; }
@@ -992,13 +1003,17 @@
         .mb-setting-h4-right.btn-help:hover { background:#e4f6ea; color:#276749; border-color:#c9e8d4; }
         .mb-setting-row textarea { padding:8px; }
         .mb-setting-sep { margin:10px 16px 0;padding-top:20px;border-top:1px solid var(--mb-border); }
+        /* 胶囊宽度恒定：悬停不再展开任何图标，鼠标划过不会把后面的胶囊挤到第二行 */
         .mb-user-tag { display:inline-flex;align-items:center;gap:4px;height:24px;padding:0 10px;box-sizing:border-box;background:var(--mb-bg-page);border:1px solid var(--mb-accent-line);border-radius:var(--mb-radius);font-size:var(--mb-font-sm);color:var(--mb-accent-deep);line-height:1; }
-        .mb-user-tag .mb-tag-group { cursor:pointer;display:none;padding:2px 4px;border-radius:var(--mb-radius-sm);transition:background var(--mb-t-fast),color var(--mb-t-fast);color:var(--mb-text-muted); }
-        .mb-user-tag:hover .mb-tag-group, .mb-user-tag:hover .mb-tag-x { display:inline-flex; }
-        .mb-user-tag .mb-tag-group:hover { background:var(--mb-accent-soft); color:var(--mb-accent-deep); }
-        .mb-user-tag .mb-tag-x { cursor:pointer;display:none;padding:2px 4px;border-radius:var(--mb-radius-sm);transition:background var(--mb-t-fast),color var(--mb-t-fast);color:var(--mb-text-muted); }
-        .mb-user-tag .mb-tag-x:hover { background:var(--mb-danger-soft); color:var(--mb-danger); }
-        .mb-user-tag .mb-tag-group svg, .mb-user-tag .mb-tag-x svg { display:block; }
+        .mb-user-tag.mb-tag-selected { border-color:var(--mb-danger); background:var(--mb-danger-soft); }
+        .mb-tag-check { display:none; width:15px; height:15px; margin:0 2px 0 0; accent-color:var(--mb-danger); cursor:pointer; flex:0 0 auto; }
+        .mb-fav-host.mb-editing .mb-tag-check { display:inline-block; }
+        .mb-fav-host.mb-editing .mb-user-tag { cursor:pointer; }
+        /* 编辑入口移到头部副标题行右侧，工具条只在编辑态整条展开 */
+        .mb-fav-edit-bar { display:none; align-items:center; gap:8px; margin-bottom:10px; flex-wrap:wrap; }
+        .mb-fav-edit-bar .mb-btn { padding:5px 12px; font-size:var(--mb-font-sm); }
+        .mb-fav-host.mb-editing .mb-fav-edit-bar { display:flex; }
+        .mb-favorite-tab.mb-tab-drop { border-color:var(--mb-accent); background:var(--mb-accent-soft); color:var(--mb-accent-deep); box-shadow:0 0 0 2px var(--mb-accent-soft); }
         .mb-floor-plus { cursor:pointer;font-size:var(--mb-font-sm);margin-left:4px;outline:none;font-weight:400; }
         .mb-favorite-on { color:var(--mb-favorite-on) !important; }
         .mb-favorite-on .mb-star-svg { color:var(--mb-favorite-on) !important; }
@@ -1114,8 +1129,6 @@
         .mb-favorite-users-list { display:flex; flex-wrap:wrap; align-items:flex-start; align-content:flex-start; gap:6px; min-height:56px; max-height:120px; overflow-y:auto; padding-right:4px; }
         .mb-favorite-users-empty { color:var(--mb-text-hint); font-size:var(--mb-font-md); padding:10px 2px; }
         /* 拖拽排序期间禁用悬停展开，避免鼠标划过时胶囊变宽把后面的挤下第二行 */
-        .mb-favorite-users-list.mb-dragging .mb-user-tag .mb-tag-group,
-        .mb-favorite-users-list.mb-dragging .mb-user-tag .mb-tag-x { display:none !important; }
         .mb-favorite-users-list.mb-dragging .mb-user-tag { cursor:grabbing; }
         /* 设置面板里的收藏馆入口卡片 */
         .mb-fav-entry-card { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 14px; border:1px solid var(--mb-border); border-radius:var(--mb-radius); background:var(--mb-bg-page); }
@@ -1124,9 +1137,19 @@
         .mb-fav-entry-card .mb-btn { flex:0 0 auto; padding:6px 16px; }
         /* 收藏馆独立弹窗：比设置弹窗更宽更高，内部留白放开，拖拽才好操作 */
         .mb-fav-gallery-modal { width:900px; max-width:95vw; padding:30px 32px; }
-        .mb-fav-gallery-head { margin-bottom:18px; padding-bottom:16px; border-bottom:1px solid var(--mb-border); }
+        .mb-fav-gallery-head { display:flex; align-items:center; gap:14px; margin-bottom:18px; padding-bottom:16px; border-bottom:1px solid var(--mb-border); }
+        .mb-fav-gallery-avatar { width:46px; height:46px; border-radius:50%; object-fit:cover; flex:0 0 auto; background:var(--mb-bg-page); }
+        .mb-fav-gallery-head-text { flex:1 1 auto; min-width:0; }
         .mb-fav-gallery-modal .mb-dialog-title { font-size:18px; margin-bottom:6px; }
         .mb-fav-gallery-modal .mb-dialog-sub { line-height:1.75; margin-bottom:0; }
+        /* 标题行内放「编辑」与「关闭 ×」，不再单独占行 */
+        .mb-fav-title-row { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+        .mb-fav-title-row .mb-dialog-title { margin-bottom:0; }
+        .mb-fav-title-actions { display:flex; align-items:center; gap:6px; margin-left:auto; flex:0 0 auto; }
+        .mb-fav-gallery-edit { padding:3px 10px; font-size:var(--mb-font-sm); }
+        .mb-fav-gallery-x { width:24px; height:24px; padding:0; border:none; background:transparent; color:var(--mb-text-muted); font-size:18px; line-height:1; cursor:pointer; border-radius:var(--mb-radius); display:inline-flex; align-items:center; justify-content:center; transition:background var(--mb-t-fast) ease, color var(--mb-t-fast) ease; }
+        .mb-fav-gallery-x:hover { background:var(--mb-bg-secondary); color:var(--mb-text-primary); }
+        .mb-fav-group-picker { display:flex; flex-wrap:wrap; gap:8px; margin:14px 0 16px; }
         .mb-fav-gallery-modal .mb-fav-gallery-tabs { max-height:126px; margin-bottom:18px; gap:8px; }
         .mb-fav-gallery-modal .mb-fav-gallery-list { max-height:min(560px, 58vh); min-height:210px; gap:8px; padding:4px 6px 4px 0; }
         /* 大弹窗里胶囊也放大一档，24px 在这儿显得局促 */
@@ -1140,8 +1163,11 @@
         .mb-favorite-users-actions { display:flex; gap:8px; margin-top:auto; justify-content:space-between; align-items:center; padding-top:12px; }
         .mb-favorite-users-actions .mb-btn { flex:1 1 0; padding:6px 10px; }
         /* 分组 tab 栏：最多两行 */
-        .mb-favorite-tabs { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; max-height:56px; overflow-y:auto; }
-        .mb-favorite-tab { display:inline-flex; align-items:center; gap:6px; height:24px; padding:0 10px 0 4px; box-sizing:border-box; border-radius:var(--mb-radius); background:var(--mb-bg-page); border:1px solid var(--mb-border); font-size:var(--mb-font-sm); cursor:pointer; color:var(--mb-text-muted); user-select:none; }
+        /* 自定义分组为人工创建且数量可增长，锁定单行 + 横向滚动，避免换行把弹窗撑高 */
+        .mb-favorite-tabs { display:flex; flex-wrap:nowrap; gap:6px; margin-bottom:10px; overflow-x:auto; overflow-y:hidden; scrollbar-width:none; -ms-overflow-style:none; padding-bottom:2px; }
+        .mb-favorite-tabs::-webkit-scrollbar { display:none; }
+        /* 分组 tab 用浅底无描边，与白底描边的用户胶囊拉开层级 */
+        .mb-favorite-tab { display:inline-flex; align-items:center; gap:6px; height:24px; padding:0 10px 0 4px; box-sizing:border-box; border-radius:var(--mb-radius); background:var(--mb-bg-secondary); border:1px solid transparent; font-size:var(--mb-font-sm); cursor:pointer; color:var(--mb-text-muted); user-select:none; }
         .mb-favorite-tab i { font-style:normal; min-width:20px; height:20px; padding:0 4px; margin:0; border-radius:var(--mb-radius-pill); background:var(--mb-accent-soft); color:var(--mb-accent-deep); font-size:var(--mb-font-xs); font-weight:600; display:inline-flex; align-items:center; justify-content:center; opacity:1; }
         .mb-favorite-tab.active { background:var(--mb-accent-soft, #eef4ff); border-color:var(--mb-accent-line, #d6e4ff); color:var(--mb-accent-deep, #1d6fd1); }
         .mb-favorite-tab.active i { opacity:1; background:var(--mb-bg-page, #fff); }
@@ -3935,6 +3961,151 @@
         const listEl = container.querySelector('.mb-favorite-users-list');
         const tabsEl = container.querySelector('.mb-favorite-tabs');
         let activeGuolv = '全部';
+        let dragUid = null;           // 正在拖动的胶囊 uid（拖到上方分组 tab 上即归组）
+        let editing = false;          // 勾选删除编辑态
+        const selected = new Set();   // 编辑态已选中的 uid
+
+        // 批量把若干用户移入目标分组（「全部」是视图不是容器，不接受落点）
+        // 原 assignGroup 只支持单个 uid，这里抽成批量版，拖拽归组与编辑态批量移动共用
+        function moveUsersToGroup(uids, targetName) {
+            const list = Array.from(uids || []).map(String);
+            if (!list.length || targetName === '全部') return 0;
+            const all = Util.userStore.get('mengbao.zengqiang.favorite_users', {}) || {};
+            let moved = 0;
+            list.forEach(uid => {
+                if (!all[uid]) return;
+                all[uid].group = (targetName === '未分组') ? '' : targetName;
+                moved++;
+            });
+            if (!moved) return 0;
+            Util.userStore.set('mengbao.zengqiang.favorite_users', all);
+            window.dispatchEvent(new CustomEvent('mengbao:favusers-changed'));
+            // 「未分组」不是一个分组名，文案按语义说「移出分组」
+            Util.toast(targetName === '未分组'
+                ? ('已把 ' + moved + ' 位用户移出分组')
+                : ('已把 ' + moved + ' 位用户移入「' + targetName + '」'), 1600, 'favorite');
+            renderTabs(); renderList();
+            return moved;
+        }
+
+        // 单个用户归组（拖到分组 tab 上触发）
+        function assignGroup(uid, targetName) {
+            dragUid = null;
+            return moveUsersToGroup([uid], targetName);
+        }
+
+        // 编辑态工具条：非编辑态整条隐藏；编辑入口已移到弹窗头部标题行右侧
+        const hostEl = listEl ? listEl.parentElement : null;
+        if (hostEl) hostEl.classList.add('mb-fav-host');
+        // 拖胶囊期间临时关掉分组 tab 自身的 draggable。
+        // tab 本身可拖（用于分组排序），而 Chrome 在源与目标都可拖时会把 dropEffect 锁成 none，
+        // 表现就是光标显示禁止符号 ⊗、但 tab 高亮（说明 preventDefault 其实已生效）的怪状态。
+        const lockTabDraggable = (lock) => {
+            if (!tabsEl) return;
+            tabsEl.querySelectorAll('.mb-favorite-tab').forEach(t => {
+                const n = t.dataset.name;
+                t.draggable = !lock && n !== '全部' && n !== '未分组';
+            });
+        };
+        // 兜底——拖胶囊经过收藏馆内空白区不再显示 ⊗；
+        // tab 自己已处理的事件不覆盖，保留「全部」tab 明确拒绝的行为
+        if (hostEl) {
+            hostEl.addEventListener('dragover', (e) => {
+                if (!dragUid || e.defaultPrevented) return;
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+            });
+            hostEl.addEventListener('drop', (e) => { if (dragUid) e.preventDefault(); });
+        }
+        const barEl = document.createElement('div');
+        barEl.className = 'mb-fav-edit-bar';
+        barEl.innerHTML = '<button class="mb-btn mb-btn-secondary mb-fav-select-all">全选</button>'
+            + '<button class="mb-btn mb-btn-secondary mb-fav-move-selected" disabled>移入分组</button>'
+            + '<button class="mb-btn mb-btn-danger mb-fav-del-selected" disabled>删除选中 (0)</button>'
+            + '<button class="mb-btn mb-btn-secondary mb-fav-edit-cancel">取消</button>';
+        if (hostEl) hostEl.insertBefore(barEl, listEl);
+        // 头部「编辑」入口（容器内查找，找不到时保持无入口也不报错）
+        const editToggleEl = container.querySelector('.mb-fav-edit-toggle');
+
+        const syncDelBtn = () => {
+            const b = barEl.querySelector('.mb-fav-del-selected');
+            b.textContent = '删除选中 (' + selected.size + ')';
+            b.disabled = selected.size === 0;
+            const mv = barEl.querySelector('.mb-fav-move-selected');
+            if (mv) mv.disabled = selected.size === 0;
+        };
+        const visibleUids = () => Array.from(listEl ? listEl.querySelectorAll('.mb-user-tag') : []).map(t => String(t.dataset.uid));
+        const toggleSelected = (uid, on) => {
+            if (on) selected.add(uid); else selected.delete(uid);
+            const tag = listEl && listEl.querySelector('.mb-user-tag[data-uid="' + uid + '"]');
+            if (tag) tag.classList.toggle('mb-tag-selected', !!on);
+            syncDelBtn();
+        };
+        const setEditing = (on) => {
+            editing = !!on;
+            selected.clear();
+            if (hostEl) hostEl.classList.toggle('mb-editing', editing);
+            if (editToggleEl) editToggleEl.style.display = editing ? 'none' : '';
+            renderList();
+            syncDelBtn();
+        };
+        if (editToggleEl) editToggleEl.onclick = () => setEditing(true);
+        barEl.querySelector('.mb-fav-edit-cancel').onclick = () => setEditing(false);
+        // 编辑态直接指定分组，免去逐个拖拽
+        barEl.querySelector('.mb-fav-move-selected').onclick = () => {
+            if (!selected.size) return;
+            const targets = ['未分组', ...getGroups()];
+            const picker = openModal({
+                width: 'sm',
+                body: `
+                    <div class="mb-dialog-title">移入分组</div>
+                    <div class="mb-dialog-sub">已选中 ${selected.size} 位用户，点选目标分组：</div>
+                    <div class="mb-fav-group-picker">${targets.map(g => `<button class="mb-btn mb-btn-secondary mb-fav-pick-group" data-g="${Util.escapeHtml(g)}">${Util.escapeHtml(g)}</button>`).join('')}</div>
+                    <div class="mb-dialog-actions">
+                        <button class="mb-btn mb-btn-secondary mb-fav-pick-cancel">取消</button>
+                    </div>`
+            });
+            picker.query('.mb-fav-pick-cancel').onclick = () => picker.close();
+            picker.box.querySelectorAll('.mb-fav-pick-group').forEach(btn => {
+                btn.onclick = () => {
+                    const target = btn.dataset.g;
+                    picker.close();
+                    moveUsersToGroup(selected, target);
+                    setEditing(false);   // 移组后退出编辑态：当前 tab 可能已筛掉这批人，保留选中会与实际视图不一致
+                };
+            });
+        };
+        barEl.querySelector('.mb-fav-select-all').onclick = () => {
+            const vis = visibleUids();
+            const allSel = vis.length && vis.every(u => selected.has(u));
+            vis.forEach(u => { if (allSel) selected.delete(u); else selected.add(u); });
+            renderList(); syncDelBtn();
+        };
+        barEl.querySelector('.mb-fav-del-selected').onclick = () => {
+            if (!selected.size) return;
+            const n = selected.size;
+            const confirmModal = openModal({
+                width: 'sm',
+                body: `
+                    <div class="mb-dialog-title">删除选中用户</div>
+                    <p style="margin:12px 0;color:var(--mb-text-muted);font-size:var(--mb-font-md);">确定取消收藏这 ${n} 位用户？此操作无法撤销。</p>
+                    <div class="mb-dialog-actions">
+                        <button class="mb-btn-cancel mb-btn mb-btn-secondary">取消</button>
+                        <button class="mb-btn-ok mb-btn mb-btn-danger">删除</button>
+                    </div>`
+            });
+            confirmModal.query('.mb-btn-cancel').onclick = () => confirmModal.close();
+            confirmModal.query('.mb-btn-ok').onclick = () => {
+                const all = Util.userStore.get('mengbao.zengqiang.favorite_users', {}) || {};
+                selected.forEach(uid => { delete all[uid]; });
+                Util.userStore.set('mengbao.zengqiang.favorite_users', all);
+                window.dispatchEvent(new CustomEvent('mengbao:favusers-changed'));
+                Util.toast('已取消收藏 ' + n + ' 位用户', 2000, 'favorite');
+                confirmModal.close();
+                setEditing(false);
+                renderTabs();
+            };
+        };
 
         const getGroups = () => Util.userStore.get('mengbao.zengqiang.favorite_groups', []) || [];
         const setGroups = (g) => Util.userStore.set('mengbao.zengqiang.favorite_groups', g);
@@ -3942,6 +4113,8 @@
         // 渲染 tab 栏：全部 / 未分组 / 每个分组
         function renderTabs() {
             if (!tabsEl) return;
+            // tab 行改单行横向滚动后，重绘要保持原滚动位置，否则选中靠右分组会跳回开头
+            const keepScroll = tabsEl.scrollLeft;
             const groups = getGroups();
             const favoriteUsers = Util.userStore.get('mengbao.zengqiang.favorite_users', {}) || {};
             const allKeys = Object.keys(favoriteUsers);
@@ -3950,17 +4123,20 @@
             const tabs = ['全部', '未分组', ...groups];
             tabsEl.innerHTML = tabs.map(t => {
                 const draggable = (t !== '全部' && t !== '未分组') ? 'draggable="true"' : '';
-                return `<span class="mb-favorite-tab ${t === activeGuolv ? 'active' : ''}" data-guolv="${Util.escapeHtml(t)}" data-name="${Util.escapeHtml(t)}" title="右键：重命名或删除（内置分组不可改）" ${draggable}><i>${counts[t] || 0}</i>${Util.escapeHtml(t)}</span>`;
+                const tip = t === '全部' ? '显示全部收藏用户' : (t === '未分组' ? '把胶囊拖到这里可移出分组' : '把胶囊拖到这里可归入该组；右键重命名或删除');
+                return `<span class="mb-favorite-tab ${t === activeGuolv ? 'active' : ''}" data-guolv="${Util.escapeHtml(t)}" data-name="${Util.escapeHtml(t)}" title="${tip}" ${draggable}><i>${counts[t] || 0}</i>${Util.escapeHtml(t)}</span>`;
             }).join('');
+            tabsEl.scrollLeft = keepScroll;
 
             let dragTab = null;
             tabsEl.querySelectorAll('.mb-favorite-tab').forEach(tab => {
                 tab.onclick = () => { activeGuolv = tab.dataset.guolv; renderTabs(); renderList(); };
-                // 拖拽排序（仅自定义分组，全部/未分组不可拖）
                 const tabName = tab.dataset.name;
+                // 分组自身排序（仅自定义分组可拖）
                 if (tabName !== '全部' && tabName !== '未分组') {
                     tab.draggable = true;
                     tab.ondragstart = (e) => {
+                        if (dragUid) return;            // 胶囊拖动时不抢
                         dragTab = tab;
                         e.dataTransfer.effectAllowed = 'move';
                         tab.style.opacity = '0.5';
@@ -3969,27 +4145,39 @@
                         dragTab = null;
                         tab.style.opacity = '';
                     };
-                    tab.ondragover = (e) => {
-                        e.preventDefault();
-                        e.dataTransfer.dropEffect = 'move';
-                    };
-                    tab.ondrop = (e) => {
-                        e.preventDefault();
-                        if (!dragTab || dragTab === tab) return;
-                        const fromName = dragTab.dataset.name;
-                        const toName = tab.dataset.name;
-                        // 重新排序分组
-                        let g = getGroups();
-                        const fromIdx = g.indexOf(fromName);
-                        const toIdx = g.indexOf(toName);
-                        if (fromIdx === -1 || toIdx === -1) return;
-                        g.splice(fromIdx, 1);
-                        // 从前往后拖时目标下标已左移一位，直接插会落到目标后面
-                        g.splice(fromIdx < toIdx ? toIdx - 1 : toIdx, 0, fromName);
-                        setGroups(g);
-                        renderTabs();
-                    };
                 }
+                // 所有分组都能接胶囊（「全部」是视图不是容器，不接受）
+                tab.ondragover = (e) => {
+                    if (dragUid) {
+                        e.preventDefault();
+                        if (tabName === '全部') { e.dataTransfer.dropEffect = 'none'; return; }
+                        e.dataTransfer.dropEffect = 'move';
+                        tab.classList.add('mb-tab-drop');
+                        return;
+                    }
+                    if (!dragTab) return;
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                };
+                tab.ondragleave = () => tab.classList.remove('mb-tab-drop');
+                tab.ondrop = (e) => {
+                    e.preventDefault();
+                    tab.classList.remove('mb-tab-drop');
+                    // 胶囊拖进来 → 归入该组
+                    if (dragUid) { assignGroup(dragUid, tabName); return; }
+                    // 分组拖分组 → 排序
+                    if (!dragTab || dragTab === tab) return;
+                    const fromName = dragTab.dataset.name;
+                    const toName = tabName;
+                    let g = getGroups();
+                    const fromIdx = g.indexOf(fromName);
+                    const toIdx = g.indexOf(toName);
+                    if (fromIdx === -1 || toIdx === -1) return;
+                    g.splice(fromIdx, 1);
+                    g.splice(fromIdx < toIdx ? toIdx - 1 : toIdx, 0, fromName);
+                    setGroups(g);
+                    renderTabs();
+                };
                 // 右键弹分组操作弹窗（仅自定义分组可重命名/删除；全部/未分组禁用）
                 tab.oncontextmenu = (e) => {
                     e.preventDefault(); e.stopPropagation();
@@ -4072,116 +4260,63 @@
                 return;
             }
             listEl.innerHTML = entries.map(([uid, info]) => {
-                return `<span class="mb-user-tag" draggable="true" data-uid="${Util.escapeHtml(uid)}" data-home="home.php?mod=space&uid=${Util.escapeHtml(uid)}" title="右键点击用户名跳转（设置里可配置）">`
+                const u = Util.escapeHtml(uid);
+                const on = selected.has(String(uid));
+                const tip = editing ? '点击勾选要删除的用户' : '拖到上方分组可归入该组；右键点击用户名跳转';
+                return `<span class="mb-user-tag${on ? ' mb-tag-selected' : ''}" draggable="${editing ? 'false' : 'true'}" data-uid="${u}" data-home="home.php?mod=space&uid=${u}" title="${tip}">`
+                    + `<input type="checkbox" class="mb-tag-check" data-uid="${u}"${on ? ' checked' : ''}>`
                     + `<span class="mb-tag-name">${Util.escapeHtml(info.username || uid)}</span>`
-                    + `<span class="mb-tag-group" data-uid="${Util.escapeHtml(uid)}" title="点击切换该用户的分组">${mbIconSvg('switch')}</span>`
-                    + `<span class="mb-tag-x" data-uid="${Util.escapeHtml(uid)}" title="取消收藏该用户">${mbIconSvg('x')}</span>`
                     + `</span>`;
             }).join('');
 
-            // 拖拽排序
-            let dragTag = null;
+            // 胶囊交互：拖拽排序 / 拖到上方分组 tab 归组 / 编辑态勾选
             listEl.querySelectorAll('.mb-user-tag').forEach(tag => {
+                const uid = String(tag.dataset.uid);
+                if (editing) {
+                    const cb = tag.querySelector('.mb-tag-check');
+                    tag.onclick = (e) => {
+                        if (e.target === cb) return;
+                        cb.checked = !cb.checked;
+                        toggleSelected(uid, cb.checked);
+                    };
+                    cb.onclick = (e) => { e.stopPropagation(); toggleSelected(uid, cb.checked); };
+                    return;
+                }
                 tag.ondragstart = (e) => {
-                    dragTag = tag;
-                    e.dataTransfer.effectAllowed = 'move';
+                    dragUid = uid;
+                    // effectAllowed 放宽到 all，避免与目标 dropEffect 的组合被浏览器判为不可放置
+                    e.dataTransfer.effectAllowed = 'all';
+                    lockTabDraggable(true);
+                    // 原为 text/plain + 'uid:xxx'，松手在未接收区域时浏览器会把它当纯文本新开窗口搜索；
+                    // 改自定义类型后浏览器不再按文本/URL 处理，只在本脚本的 drop 处理器里读 uid
+                    try { e.dataTransfer.setData('application/x-mb-uid', uid); } catch (err) {}
                     tag.style.opacity = '0.5';
-                    // 拖拽期间整列胶囊都不展开，布局全程稳定
                     listEl.classList.add('mb-dragging');
                 };
                 tag.ondragend = () => {
-                    dragTag = null;
+                    dragUid = null;
+                    lockTabDraggable(false);
                     tag.style.opacity = '';
                     listEl.classList.remove('mb-dragging');
                 };
-                tag.ondragover = (e) => {
-                    e.preventDefault();
-                    e.dataTransfer.dropEffect = 'move';
-                };
+                tag.ondragover = (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; };
                 tag.ondrop = (e) => {
                     e.preventDefault();
-                    if (!dragTag || dragTag === tag) return;
-                    // 保存新顺序：只动顺序数组，不重建对象（对象键会被 JS 强制按 uid 升序）
+                    // 拖到另一个胶囊 = 排序；要换分组请拖到上方分组 tab
+                    if (!dragUid || dragUid === uid) return;
                     const all = Util.userStore.get('mengbao.zengqiang.favorite_users', {}) || {};
                     const order = Util.favUserOrder.get(all);
-                    const fromUid = String(dragTag.dataset.uid);
-                    const toUid = String(tag.dataset.uid);
-                    const fromIdx = order.indexOf(fromUid);
-                    const toIdx = order.indexOf(toUid);
+                    const fromIdx = order.indexOf(dragUid);
+                    const toIdx = order.indexOf(uid);
                     if (fromIdx === -1 || toIdx === -1) return;
                     order.splice(fromIdx, 1);
-                    // 前移到后时插到目标位置，而不是目标后面
-                    order.splice(fromIdx < toIdx ? toIdx - 1 : toIdx, 0, fromUid);
+                    order.splice(fromIdx < toIdx ? toIdx - 1 : toIdx, 0, dragUid);
                     Util.favUserOrder.save(order);
+                    dragUid = null;
                     listEl.classList.remove('mb-dragging');
                     renderList();
                 };
-            });
-            // 绑定 ✕
-            listEl.querySelectorAll('.mb-tag-x').forEach(x => {
-                x.onclick = (e) => {
-                    e.stopPropagation();
-                    const uid = x.dataset.uid;
-                    const tagName = x.parentElement.querySelector('.mb-tag-name');
-                    const name = (tagName && tagName.textContent.trim()) || uid;
-                    const all = Util.userStore.get('mengbao.zengqiang.favorite_users', {});
-                    delete all[uid]; Util.userStore.set('mengbao.zengqiang.favorite_users', all);
-                    window.dispatchEvent(new CustomEvent('mengbao:favusers-changed'));
-                    Util.toast(`已取消收藏：用户 ${name}`, 2000, 'favorite');
-                    renderTabs(); renderList();
-                };
-            });
-            // 绑定分组切换
-            listEl.querySelectorAll('.mb-tag-group').forEach(g => {
-                g.onclick = (e) => {
-                    e.stopPropagation();
-                    const uid = g.dataset.uid;
-                    const all = Util.userStore.get('mengbao.zengqiang.favorite_users', {});
-                    const cur = all[uid] && all[uid].group || '';
-                    const groups = getGroups();
-                    const opts = ['未分组', ...groups];
-
-                    const modal = openModal({
-                        width: 'sm',
-                        closeOnMaskClick: false,
-                        body: `
-                        <div class="mb-dialog-title">切换分组</div>
-                        <input type="text" class="mb-prompt-input mb-modal-textarea mb-input-base" placeholder="输入分组名" value="${Util.escapeHtml(cur)}">
-                        <div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:6px;">
-                            ${opts.map(o => `<span class="mb-group-tag-option" data-name="${Util.escapeHtml(o)}" style="padding:4px 10px;border-radius:var(--mb-radius);background:var(--mb-bg-secondary);cursor:pointer;font-size:var(--mb-font-sm);">${Util.escapeHtml(o)}</span>`).join('')}
-                        </div>
-                        <div class="mb-dialog-actions">
-                            <button class="mb-btn-cancel mb-btn mb-btn-secondary">取消</button>
-                            <button class="mb-btn-ok mb-btn mb-btn-primary">确定</button>
-                        </div>`
-                    });
-
-                    const input = modal.query('.mb-prompt-input');
-                    input.focus();
-                    modal.query('.mb-btn-cancel').onclick = () => modal.close();
-
-                    // 点击标签填入输入框
-                    modal.box.querySelectorAll('.mb-group-tag-option').forEach(tag => {
-                        tag.onclick = () => {
-                            input.value = tag.dataset.name;
-                        };
-                    });
-
-                    modal.query('.mb-btn-ok').onclick = () => {
-                        const name = input.value.trim();
-                        if (!name) { modal.close(); return; }
-                        if (name && !groups.includes(name)) { groups.push(name); setGroups(groups); }
-                        all[uid].group = (name === '未分组' || name === '') ? '' : name;
-                        Util.userStore.set('mengbao.zengqiang.favorite_users', all);
-                        modal.close();
-                        renderTabs(); renderList();
-                    };
-                    input.addEventListener('keydown', e => { if (e.key === 'Enter') modal.query('.mb-btn-ok').click(); });
-                };
-            });
-            // 右键标签访问用户主页（可配置：home/thread/reply/off）
-            listEl.querySelectorAll('.mb-user-tag').forEach(tag => {
-                bindUserJumpMenu(tag, tag.dataset.uid);
+                bindUserJumpMenu(tag, uid);
             });
         }
 
@@ -4299,17 +4434,26 @@
     function openFavGallery() {
         const users = Util.userStore.get('mengbao.zengqiang.favorite_users', {}) || {};
         const groups = Util.userStore.get('mengbao.zengqiang.favorite_groups', []) || [];
-        const kwCount = (Util.userStore.get('mengbao.comment.favorite', '') || '')
-            .split('\n').map(x => x.trim()).filter(Boolean).length;
         const userCount = Object.keys(users).length;
+        const favRaw = Util.userStore.get('mengbao.cmtfav.avatar', '') || '';
+        const favAvatar = /^builtin:[12]$/.test(favRaw) ? (window['BUILTIN_AVATAR_' + favRaw.slice(8)] || '') : favRaw;
+        const favAvatarSrc = favAvatar || (window.BUILTIN_AVATAR_2 || '');
         const modal = openModal({
             width: 'md',
             extraClass: 'mb-fav-gallery-modal',
             body: `
             <div class="mb-fav-gallery-head">
-                <div class="mb-dialog-title">⭐ 收藏馆</div>
-                <div class="mb-dialog-sub">${userCount} 位用户${groups.length ? ' · ' + groups.length + ' 个分组' : ''}　拖拽胶囊排序，移入胶囊可切换分组或取消收藏，右键进入用户主页</div>
-            </div>
+                <img class="mb-fav-gallery-avatar" src="${favAvatarSrc}" alt="">
+                <div class="mb-fav-gallery-head-text">
+                <div class="mb-fav-title-row">
+                    <div class="mb-dialog-title">⭐ 收藏馆</div>
+                    <div class="mb-fav-title-actions">
+                        <button class="mb-btn mb-btn-secondary mb-fav-gallery-edit mb-fav-edit-toggle" title="批量取消收藏或移入分组">✏️ 编辑</button>
+                        <button class="btn-fav-gallery-close mb-fav-gallery-x" title="关闭">×</button>
+                    </div>
+                </div>
+                <div class="mb-dialog-sub">${userCount} 位用户${groups.length ? ' · ' + groups.length + ' 个分组' : ''}　拖到上方分组可归组，拖动胶囊可排序；点「编辑」可批量取消收藏或移入分组；右键进入用户主页</div>
+            </div></div>
             <div class="mb-favorite-tabs mb-fav-gallery-tabs"></div>
             <div class="mb-favorite-users-list mb-fav-gallery-list"></div>
             <div class="mb-favorite-users-actions">
@@ -4317,18 +4461,11 @@
                 <button class="btn-export-users mb-btn mb-btn-secondary">导出</button>
                 <button class="btn-import-users mb-btn mb-btn-secondary">导入</button>
             </div>
-            <div class="mb-fav-kw-tip" title="收藏关键词在帖子页右侧评论面板的收藏馆里管理">
-                <span>🔍 收藏关键词 ${kwCount} 个</span>
-                <span style="color:var(--mb-accent-deep);">在评论面板中管理 →</span>
-            </div>
-            <div class="mb-dialog-actions">
-                <button class="btn-fav-gallery-close mb-btn mb-btn-secondary">关闭</button>
-            </div>`
+`
         });
         // 与设置面板共用同一份渲染/拖拽/导入导出逻辑，不另写一套
         bindFavUserRemove(modal.box);
         modal.query('.btn-fav-gallery-close').onclick = () => modal.close();
-        modal.query('.mb-fav-kw-tip').onclick = () => Util.toast('收藏关键词在帖子页右侧评论面板的「收藏馆」tab 里添加和搜索', 2600);
         return modal;
     }
 
@@ -4947,7 +5084,15 @@
             });
         };
         // 个人资料页判定：URL 可能只有 username（home.php?mod=space&username=xxx），没有 uid
-        const isProfilePage = () => /mod=space\b|space-uid-\d+|space-username-/.test(location.href);
+        // 注意：home.php?mod=space 还复用于短消息(do=pm)、提醒(do=notice)等子页面，
+        // 不能只凭 mod=space 就当成资料页，否则会把星标挂到右上角"当前登录用户"上。
+        const isProfilePage = () => {
+            if (/space-uid-\d+|space-username-/.test(location.href)) return true;
+            if (!/mod=space\b/.test(location.href)) return false;
+            const m = location.href.match(/[?&]do=([a-z]+)/i);
+            if (!m) return true;                                  // home.php?mod=space&uid=x
+            return /^(profile|thread)$/.test(m[1].toLowerCase());  // 资料页 / 个人主题页
+        };
         // 取当前资料页用户的 uid：URL 有就用，没有就从 #uhd 里带 uid 的链接反查
         const getProfileUid = () => {
             const m = location.href.match(/uid=(\d+)/) || location.href.match(/space-uid-(\d+)/);
@@ -5370,7 +5515,6 @@
         .mb-comment-app { padding:8px; font-size:var(--mb-font-md); line-height:1.6; font-family:Tahoma, Helvetica, "Microsoft Yahei", sans-serif; color:var(--mb-text-primary); position:fixed; top:4vh; right:2%; max-height:92vh; box-sizing:border-box; background:var(--mb-bg-page); border:1px solid rgba(0,0,0,0.08); border-radius:var(--mb-radius); overflow:hidden; opacity:.6; }
         .mb-comment-app:hover { opacity:1; border-color:var(--mb-accent); z-index:2; }
         .mb-comment-panel { height:calc(92vh - 80px); display:flex; flex-direction:column; }
-        .mb-comment-panel-fav { height:auto; max-height:70vh; overflow:auto; overflow-anchor:none; contain:layout; }
         .mb-comment-scroll { flex:1; min-height:0; overflow:auto; }
         .mb-comment-head { display:flex; flex-direction:column; border-bottom:1px solid var(--mb-border); padding:6px 12px; }
         .mb-comment-title { font-size:var(--mb-font-title); font-weight:700; }
@@ -5411,26 +5555,7 @@
         .mb-comment-slider-row input[type=range]::-moz-range-track { height:4px; border-radius:2px; background:rgba(0,0,0,0.10); }
         .mb-comment-slider-row input[type=range]::-moz-range-thumb { width:12px; height:12px; border:none; border-radius:50%; background:var(--mb-accent); }
         /* 收藏馆 */
-        .mb-comment-tabs { display:flex; align-items:center; gap:4px; }
-        .mb-comment-tab { display:inline-flex; align-items:center; justify-content:center; min-width:68px; height:26px; padding:0 12px; box-sizing:border-box; border-radius:var(--mb-radius); cursor:pointer; user-select:none; font-size:var(--mb-font-md); font-weight:500; color:var(--mb-text-muted); background:var(--mb-bg-secondary); transition:background var(--mb-t-fast) ease, color var(--mb-t-fast) ease; }
-        .mb-comment-tab:hover { color:var(--mb-text-primary); }
-        .mb-comment-tab.active { background:var(--mb-accent-soft); color:var(--mb-accent-deep); font-weight:600; }
-        .mb-comment-cmtfav-body { padding:10px 12px; flex:0 0 auto; overflow-anchor:none; }
-        .mb-comment-cmtfav-msg { text-align:center; color:var(--mb-text-hint); font-size:var(--mb-font-sm); margin-bottom:8px; min-height:26px; line-height:26px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-        .mb-comment-cmtfav-group { display:flex; flex-wrap:wrap; padding:0 8px; justify-content:center; }
-        .mb-comment-cmtfav-item { display:flex; align-items:center; margin:4px; }
-        .mb-comment-cmtfav-btn { border-radius:var(--mb-radius-sm); padding:2px 10px; }
-        .mb-comment-cmtfav-btn:hover { background:var(--mb-accent-soft); color:var(--mb-accent-deep); border-color:var(--mb-accent-line); box-shadow:none; }
-        .mb-comment-cmtfav-close { font-size:var(--mb-font-sm); margin:0 0 4px -8px; cursor:pointer; z-index:1; display:none; color:var(--mb-text-muted); border-radius:var(--mb-radius-sm); padding:1px; transition:background var(--mb-t-fast),color var(--mb-t-fast); }
-        .mb-comment-cmtfav-item:hover .mb-comment-cmtfav-close { display:block; }
-        .mb-comment-cmtfav-close:hover { background:var(--mb-danger-soft); color:var(--mb-danger); }
-        .mb-comment-cmtfav-close svg { display:block; }
-        .mb-comment-cmtfav-footer { display:flex; justify-content:space-between; padding:8px 16px; margin-top:8px; flex:0 0 auto; }
-        .mb-comment-cmtfav-footer input { flex:1; margin-right:8px; text-align:center; padding:8px; border-radius:var(--mb-radius); }
-        .mb-comment-cmtfav-footer input:focus { border-color:var(--mb-accent); box-shadow:0 0 0 3px var(--mb-accent-soft); }
-        .mb-comment-cmtfav-footer input::placeholder { color:var(--mb-text-hint); }
         @media (hover: none), (max-width: 768px) {
-            .mb-comment-cmtfav-close { display:block; }
             .mb-comment-action { display:inline; }
         }
         .mb-comment-fallback-btn { position:fixed; top:4%; right:2%; background:var(--mb-bg-page); border:1px solid rgba(0,0,0,0.06); border-radius:var(--mb-radius); padding:8px 16px; z-index:var(--mb-z-fab); cursor:pointer; font-size:var(--mb-font-md); box-shadow:var(--mb-shadow-sm); color:var(--mb-accent); }
@@ -5440,24 +5565,20 @@
     app$.id = 'mb-comment-app';
     document.body.appendChild(app$);
 
+    // 面板内容不能再包 <template>——runtime 模板编译会把它当原生 template 元素，
+    // 子节点进 content fragment 不进 DOM，导致分页行与评论列表整体白屏（历史回归）
     const template = `
     <div class="mb-comment-app" ref="app" :style="{ display: toggleOn ? '' : 'none' }">
         <div class="mb-comment-head">
             <div class="mb-comment-head-row">
                 <div class="mb-comment-head-group">
-                    <img v-if="activePanel==='favorite' ? galleryAvatar : headerAvatar" :src="activePanel==='favorite' ? galleryAvatar : headerAvatar" class="mb-comment-header-avatar" alt="" @click="onToggle" title="点击关闭面板">
+                    <img v-if="headerAvatar" :src="headerAvatar" class="mb-comment-header-avatar" alt="" @click="onToggle" title="点击关闭面板">
                     <div v-else class="mb-comment-header-avatar mb-comment-header-avatar--empty" @click="onToggle" title="点击关闭面板">⭐</div>
                     <div class="mb-comment-title">{{ title }}</div>
                 </div>
-                <div class="mb-comment-tabs">
-                    <div class="mb-comment-tab" :class="{active: activePanel==='comment'}" @click="activePanel='comment'">评论区</div>
-                    <div class="mb-comment-tab" :class="{active: activePanel==='favorite'}" @click="switchToFav">收藏馆</div>
-                </div>
             </div>
         </div>
-        <div class="mb-comment-panel" :class="activePanel==='favorite' ? 'mb-comment-panel-fav' : ''">
-            <!-- 评论区 -->
-            <template v-if="activePanel==='comment'">
+        <div class="mb-comment-panel">
                 <div class="mb-comment-head">
                     <div class="mb-comment-head-row">
                         <div>
@@ -5495,26 +5616,6 @@
                     </div>
                     <div class="mb-comment-foot">{{ isLoading ? nickname + "正在努力加载下一页…" : nickname + "：没有更多评论啦~" }}</div>
                 </div>
-            </template>
-            <!-- 收藏馆 -->
-            <template v-else>
-                <div class="mb-comment-cmtfav-body">
-                    <div class="mb-comment-cmtfav-msg">{{ cmtfavMessage || randomHint }}</div>
-                    <div v-if="!favoriteKeywords.length" style="text-align:center;color:var(--mb-text-hint);font-size:var(--mb-font-sm);margin-top:12px;line-height:1.6;">
-                        在下方输入框添加收藏关键词<br>自动搜索展示相关帖子
-                    </div>
-                    <div class="mb-comment-cmtfav-group">
-                        <div class="mb-comment-cmtfav-item" v-for="kw in favoriteKeywords" :key="kw" draggable="true" @dragstart="onDragStartKw($event, kw)" @dragend="onDragEndKw" @dragover.prevent @drop="onDropKw($event, kw)">
-                            <div class="mb-comment-cmtfav-btn mb-pill mb-pill--outline" title="右键点击搜索这个关键词" @contextmenu.prevent="onSearchKeyword(kw)" @mouseenter="onHoverKeyword(kw)" @mouseleave="onHoverKeywordLeave">{{ kw }}</div>
-                            <div class="mb-comment-cmtfav-close" title="移除这条筛选关键词" @click="onRemoveKeyword(kw)"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></div>
-                        </div>
-                    </div>
-                </div>
-                <div class="mb-comment-cmtfav-footer">
-                    <input v-model="favoriteInput" class="mb-input-base" placeholder="添加收藏关键词" @keyup.enter="onAddKeyword" />
-                    <div class="mb-comment-cmtfav-add mb-btn mb-btn-secondary" @click="onAddKeyword">+</div>
-                </div>
-            </template>
             <div class="mb-comment-slider-row mb-comment-slider-row--divider">
                 <span>宽度: {{ appWidth }}%</span>
                 <input type="range" min="15" max="50" v-model="appWidth" @change="onWidthSliderChange" />
@@ -5540,116 +5641,20 @@
                 minContentLength: 1,
                 hasInit: false,
                 headerAvatar: '',
-                galleryAvatar: '',
-                activePanel: 'comment',
-                favoriteKeywords: [],
-                favoriteInput: '',
-                cmtfavMessage: '',
-                keywordStats: {},
                 nickname: '萌宝',
-                randomHint: '',
 
-                // Vue warn: Method "dragKw" has type "object"）
-                dragKw: null,
             };
         },
         computed: {
             title() {
-                if (this.activePanel === 'favorite') return `${this.favoriteKeywords.length} 项收藏`;
                 return `${this.totalComments} 条评论`;
             },
             filteredComments() { return this.comments.filter(x => x.contentText.length >= this.minContentLength); },
         },
         methods: {
-            switchToFav() {
-                this.activePanel = 'favorite';
-                this._updateRandomHint();
-            },
             onWidthSliderChange() {
                 userStore.set('mengbao.comment.width', this.appWidth);
                 this.$refs.app.style.width = this.appWidth + '%';
-            },
-            onAddKeyword() {
-                const kw = (this.favoriteInput || '').trim();
-                if (!kw) {
-                    this.cmtfavMessage = '请至少输入一个字符哦';
-                    setTimeout(() => { this.cmtfavMessage = ''; this.favoriteInput = ''; }, 2000);
-                    return;
-                }
-                if (this.favoriteKeywords.includes(kw)) { this.cmtfavMessage = '该关键词已存在'; setTimeout(() => this.cmtfavMessage = '', 1500); return; }
-                this.favoriteKeywords.push(kw);
-                userStore.set('mengbao.comment.favorite', this.favoriteKeywords.join('\n'));
-                this.favoriteInput = '';
-                this.cmtfavMessage = `已添加「${kw}」`;
-                setTimeout(() => this.cmtfavMessage = '', 1500);
-                // 同步更新提示语
-                this._updateRandomHint();
-            },
-            onRemoveKeyword(kw) {
-                this.favoriteKeywords = this.favoriteKeywords.filter(x => x !== kw);
-                userStore.set('mengbao.comment.favorite', this.favoriteKeywords.join('\n'));
-                this.cmtfavMessage = `已删除「${kw}」`;
-                setTimeout(() => this.cmtfavMessage = '', 1500);
-                this._updateRandomHint();
-            },
-            // 收藏关键词拖拽排序
-            onDragStartKw(e, kw) {
-                this.dragKw = kw;
-                e.dataTransfer.effectAllowed = 'move';
-                e.currentTarget.style.opacity = '0.5';
-            },
-            onDragEndKw(e) {
-                this.dragKw = null;
-                e.currentTarget.style.opacity = '';
-            },
-            onDropKw(e, targetKw) {
-                e.preventDefault();
-                if (!this.dragKw || this.dragKw === targetKw) return;
-                const fromIdx = this.favoriteKeywords.indexOf(this.dragKw);
-                const toIdx = this.favoriteKeywords.indexOf(targetKw);
-                if (fromIdx === -1 || toIdx === -1) return;
-                this.favoriteKeywords.splice(fromIdx, 1);
-                this.favoriteKeywords.splice(fromIdx < toIdx ? toIdx - 1 : toIdx, 0, this.dragKw);
-                userStore.set('mengbao.comment.favorite', this.favoriteKeywords.join('\n'));
-            },
-            _updateRandomHint() {
-                if (!this.favoriteKeywords.length) {
-                    this.randomHint = '还没有收藏关键词，添加一个试试吧~';
-                } else {
-                    const kw = this.favoriteKeywords[Math.floor(Math.random() * this.favoriteKeywords.length)];
-                    this.randomHint = `${this.nickname}：今天试试「${kw}」吧？`;
-                }
-            },
-            onHoverKeyword(kw) {
-                if (!(kw in this.keywordStats)) {
-                    this.cmtfavMessage = `没有搜索过 ${kw} 哦~`;
-                    return;
-                }
-                const stat = this.keywordStats[kw];
-                this.cmtfavMessage = `搜索次数：${stat.clicks}，最近搜索：${new Date(stat.last).toLocaleDateString()}`;
-            },
-            onHoverKeywordLeave() {
-                this.cmtfavMessage = '';
-            },
-            onSearchKeyword(kw) {
-                const url = '/search.php?mod=forum&searchsubmit=yes&srchtxt=' + encodeURIComponent(kw);
-                const w = window.open(url, '_blank');
-                //           等于没写；改为直接跳，并检查弹窗是否被浏览器拦截——原先 open 返回 null
-                //           也照样记一次搜索成功，用户看着有提示、页面根本没开
-                if (!w) {
-                    if (MB.toast) MB.toast('搜索页被浏览器拦截，请允许弹窗后重试', 2000, 'error');
-                    return;
-                }
-                this.logKeyword(kw);
-                if (MB.toast) MB.toast('已在新的标签页打开搜索', 1800, 'success');
-            },
-            logKeyword(kw) {
-                if (!(kw in this.keywordStats)) {
-                    this.keywordStats[kw] = { last: Date.now(), clicks: 0 };
-                }
-                this.keywordStats[kw].last = Date.now();
-                this.keywordStats[kw].clicks++;
-                userStore.set('mengbao.comment.keywordStats', this.keywordStats);
             },
             async checkAndLoadMore() {
                 if (this.filteredComments.length < this.commentsPerPage) await this.loadNextPage();
@@ -5801,8 +5806,6 @@
         mounted() {
             this.appWidth = parseInt(userStore.get('mengbao.comment.width', 22)) || 22;
             this.$refs.app.style.width = this.appWidth + '%';
-            try { const fav = userStore.get('mengbao.comment.favorite', ''); this.favoriteKeywords = (typeof fav === 'string' ? fav : '').split('\n').filter(x => x.trim()); } catch (e) { this.favoriteKeywords = []; }
-            try { this.keywordStats = userStore.get('mengbao.comment.keywordStats', {}) || {}; } catch (e) { this.keywordStats = {}; }
             this.minContentLength = parseInt(userStore.get('mengbao.comment.minLen', 1)) || 1;
             this.nickname = readStr('mengbao.panel.nickname', '萌宝');
             this.toggleOn = false; // 不再自动展开，由右键 FAB 控制
@@ -5824,11 +5827,6 @@
                     window.open(url, '_blank');
                 });
             }
-            // 初始化随机推荐提示
-            if (this.favoriteKeywords.length) {
-                const kw = this.favoriteKeywords[Math.floor(Math.random() * this.favoriteKeywords.length)];
-                this.randomHint = `${this.nickname}：今天试试「${kw}」吧？`;
-            }
             // 自定义头像：用户可在 GM 菜单或设置里设 mengbao.comment.avatar 为图片 URL；未设置时兜底内置默认头像1（未删除时）
             const commentRaw = readStr('mengbao.comment.avatar', '');
             // 存储里只记 builtin:n，真正取图在渲染时从常量拿
@@ -5836,11 +5834,6 @@
                 ? (window['BUILTIN_AVATAR_' + commentRaw.slice(8)] || '') : commentRaw;
             const deletedBuiltin = (typeof window.getBuiltinDeleted === 'function' ? window.getBuiltinDeleted() : []);
             this.headerAvatar = commentCustom || (deletedBuiltin.includes('1') ? '' : (window.BUILTIN_AVATAR_1 || ''));
-            // 收藏馆头像：未设置时兜底内置默认头像2（未删除时）
-            const cmtfavRaw = readStr('mengbao.cmtfav.avatar', '');
-            const cmtfavCustom = /^builtin:[12]$/.test(cmtfavRaw || '')
-                ? (window['BUILTIN_AVATAR_' + cmtfavRaw.slice(8)] || '') : cmtfavRaw;
-            this.galleryAvatar = cmtfavCustom || (deletedBuiltin.includes('2') ? '' : (window.BUILTIN_AVATAR_2 || ''));
             this.nextPageUrl = document.querySelector('.nxt') ? document.querySelector('.nxt').getAttribute('href') : '';
             this.replyThreadUrl = location.href.split('#')[0] + '#f_pst';
             try {
@@ -5867,10 +5860,6 @@
                 setNickname(v) {
                     if (!v) return;
                     self.nickname = v;
-                    if (self.favoriteKeywords && self.favoriteKeywords.length) {
-                        const kw = self.favoriteKeywords[Math.floor(Math.random() * self.favoriteKeywords.length)];
-                        self.randomHint = `${v}：今天试试「${kw}」吧？`;
-                    }
                 },
             };
         },
