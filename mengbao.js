@@ -9,7 +9,7 @@
 // ==UserScript==
 // @name         萌宝小秘书
 // @namespace    https://violentmonkey.mengbao.local/
-// @version      1.3
+// @version      1.4
 // @updateURL    https://cdn.jsdelivr.net/gh/mengbao-tools/mengbao@main/mengbao.js
 // @downloadURL  https://cdn.jsdelivr.net/gh/mengbao-tools/mengbao@main/mengbao.js
 // @description  Discuz 论坛增强套件：图片画廊预览、大图查看器、搜索过滤、自动翻页、收藏用户与帖子、评论侧边面板、评分自动满分、浏览历史标记、自定义头像
@@ -21,7 +21,7 @@
 //       写死域名一旦换站点脚本就整体失效。代价是脚本会在所有站点注入执行，
 //       实际功能由运行时白名单（IS_HOST_ALLOWED）收口，非白名单站点只加载不动作。
 // @run-at       document-start
-// @require      https://fastly.jsdelivr.net/npm/vue@3/dist/vue.global.js
+// @require      https://fastly.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js
 // @grant        GM_xmlhttpRequest
 // @grant        GM_getValue
 // @grant        GM_setValue
@@ -112,6 +112,7 @@
         'mengbao.browse.history':            { type: 'object',   def: { time: 0, data: {} }, validate: vOldOrNew(x => !!x && typeof x === 'object' && !Array.isArray(x) && typeof x.time === 'number' && !!x.data && typeof x.data === 'object' && !Array.isArray(x.data)) },
         'mengbao.browse.color':              { type: 'color',    def: '#f0f0f0', backup: true },
         'mengbao.browse.strike':             { type: 'boolean',  def: true, backup: true },
+        'mengbao.narrow.enabled':            { type: 'boolean',  def: false, backup: true },
         'mengbao.jump_target':               { type: 'enum',     def: 'home', values: ['home', 'thread', 'reply', 'off'], backup: true },
         'mengbao.favorite_highlight_bg':     { type: 'color',    def: '#dbeafe', backup: true },
         'mengbao.favorite_highlight_title':  { type: 'color',    def: '#d97706', backup: true },
@@ -738,7 +739,7 @@
             --mb-blue:#3b82f6; --mb-blue-soft:#bfdbfe; --mb-blue-soft-hover:#93c5fd; --mb-blue-glow:rgba(59,130,246,0.35);
             --mb-purple:#8b5cf6; --mb-purple-soft:#ddd6fe; --mb-purple-soft-hover:#c4b5fd; --mb-purple-glow:rgba(139,92,246,0.35);
             --mb-green-soft:#bbf7d0; --mb-green-soft-hover:#86efac;   /* 过滤球只做浅底，无连续态故不设主色 */
-            --mb-neutral-soft:#e2e8f0; --mb-neutral-soft-hover:#cbd5e1;
+            --mb-neutral-soft:#f8fafc; --mb-neutral-soft-hover:#eef2f7;
             /* toast 浮层色系：深色调 + 92% 不透明，浮在页面上不糊字 */
             --mb-toast-info:rgba(55,65,81,0.92);
             --mb-toast-success:rgba(22,101,52,0.92);
@@ -766,6 +767,50 @@
             --mb-dialog-width-sm:460px;      /* 弹窗外框宽（小：提示/确认/白名单等） */
             --mb-dialog-width-md:548px;      /* 弹窗外框宽（中：收藏馆） */
             --mb-dialog-width-lg:600px;      /* 弹窗外框宽（大：仅通用设置，两列控件右对齐后 600 更匀称） */
+            --mb-page-width:1200px;          /* 版心宽度：窄屏模式开启时由 JS 覆盖为 960 */
+        }
+        /* 窄屏模式：仅论坛窄档生效（全屏档 html 带 widthauto，自动放开）。四个居中容器必须同步收窄，
+           否则只改 #wp 会让 #nv 导航条和 #ft 页脚比正文宽出 240px，左右各错位 120px。
+           min-width:0 必须写——全屏档 #wp 带 min-width:1200px 兜底，不清掉改了等于没改。
+           margin:auto 必须写——#nv/#ft 的父容器是外层外壳，只改宽度会贴左不居中。 */
+        html.mb-narrow-mode:not(.widthauto) #wp,
+        html.mb-narrow-mode:not(.widthauto) #ct,
+        html.mb-narrow-mode:not(.widthauto) #nv,
+        html.mb-narrow-mode:not(.widthauto) #ft {
+            width:var(--mb-page-width) !important;
+            min-width:0 !important;
+            margin-left:auto !important;
+            margin-right:auto !important;
+        }
+        /* 搜索栏不在 #wp/#ct 里，是论坛独立的 #scbar（实测 1200 居中、class="cl"），不单独收窄就会比内容宽 240 */
+        html.mb-narrow-mode:not(.widthauto) #scbar {
+            width:var(--mb-page-width) !important;
+            min-width:0 !important;
+            box-sizing:border-box !important;
+            margin-left:auto !important;
+            margin-right:auto !important;
+        }
+        /* 页头：logo、右上用户信息、顶部工具条（设为首页/收藏本站）都装在 #hd / #toptb 里的 div.wp
+           （实测 1200 宽、css宽 1200px、左 47），不一起收就会停在 1200 的位置，比 960 的正文左右各外突 120px。
+           只动内层 .wp，外层 #hd 的花纹背景继续通栏，不会切掉背景。 */
+        html.mb-narrow-mode:not(.widthauto) #hd > .wp,
+        html.mb-narrow-mode:not(.widthauto) #toptb > .wp {
+            width:var(--mb-page-width) !important;
+            min-width:0 !important;
+            margin-left:auto !important;
+            margin-right:auto !important;
+        }
+        /* 窄屏是否生效由 JS 的 isNarrowEligible 决定，不在这里做页面排除：
+           只有版块列表（pg_forumdisplay）、导读（pg_guide）、帖子（pg_viewthread）、
+           搜索页（search.php，该页 body 无 class 只能按路径认）才挂 mb-narrow-mode。
+           首页、个人中心设置、勋章、排行榜等一律不挂，保持论坛原样。
+           白名单写在 JS 的 isNarrowEligible 里，所以上面几条规则不需要额外条件。 */
+        /* 搜索页例外：它没有 #wp/#nv，页脚本身就是通栏（实测 #ft 1294 全宽），强行收窄会在两侧露白底，单独放开 */
+        html.mb-narrow-mode:not(.widthauto):has(#threadlist.mb-search-card) #ft {
+            width:auto !important;
+            min-width:0 !important;
+            margin-left:0 !important;
+            margin-right:0 !important;
         }
         /* 底色与划线由 --mb-browsed-bg / --mb-browsed-strike 控制，运行时按设置注入（见 BrowseHistory.markList） */
         .mb-browsed, .mb-browsed th, .mb-browsed td {
@@ -845,11 +890,11 @@
         body:has(#threadlist.mb-search-card) .by,
         body:has(#threadlist.mb-search-card) .pg,
         body:has(#threadlist.mb-search-card) .pgs,
-        /* 搜索页宽度对齐论坛版心。论坛 #wp 固定 1200，实测列表页 / 帖子页 / 首页的内容容器均为 1200，左右边界 47 / 1247；搜索页限宽同步为 1200，四页边缘重合。 */
+        /* 搜索页宽度对齐论坛版心。实测（2026-11-09）：窄档 #wp 固定 1200，全屏档自适应且带 min-width:1200px 兜底；搜索页限宽取 --mb-page-width，与窄屏模式共用同一变量，四页边缘始终重合。 */
         /* 搜索页模板没有 #wp，外层 #ct 原生按「视口减左右各 20」撑到 1254，比版心左右各宽出 27px，因此连 #ct 一并收进版心。 */
         /* 原值 1400 是按 1311 视口调宽的临时值，实绘会超出论坛版心 200px。实测搜索页是卡片垂直流、无表格列，收窄后标题仍正常折行，不挤压作者、分页等信息，视觉变化仅为个别长标题的折行位置。 */
-        #threadlist.mb-search-card { max-width:1200px !important; margin:0 auto !important; float:none !important; width:100% !important; box-sizing:border-box; }
-        body:has(#threadlist.mb-search-card) #ct { max-width:1200px !important; margin-left:auto !important; margin-right:auto !important; }
+        #threadlist.mb-search-card { max-width:var(--mb-page-width, 1200px) !important; margin:0 auto !important; float:none !important; width:100% !important; box-sizing:border-box; }
+        body:has(#threadlist.mb-search-card) #ct { max-width:var(--mb-page-width, 1200px) !important; margin-left:auto !important; margin-right:auto !important; }
         /* 卡片区去掉左右 12px 内边距，让卡片左右边缘与论坛表格完全齐平（搜索页两侧本就留有大片空白，无需再额外留白）；上下方向的外边距不变，卡片间距照旧。 */
         #threadlist.mb-search-card { padding:0; }
         #threadlist.mb-search-card .pbw { border:1px solid rgba(128,140,150,.35) !important; border-radius:var(--mb-radius) !important; padding:12px !important; margin:0 0 12px 0 !important; background:var(--mb-bg-page) !important; float:none !important; clear:both !important; list-style:none !important; }
@@ -972,11 +1017,15 @@
         .mb-setting-h4 .icon { margin-right:4px; }
         .mb-setting-grid { display:grid;grid-template-columns:1fr 1fr;gap:10px 24px;margin:4px 0 0; }
         .mb-setting-row { display:flex;align-items:center;gap:8px;font-size:var(--mb-font-md); }
-        /* 输入框 / 下拉 / 色块（都带 mb-input-base）贴列右侧，两列形成一条对齐竖线，右侧不留空白；
-           复选框是 mb-setting-checkbox，不受这条影响，仍紧跟标签，避免标签和勾选框被拉开 */
-        .mb-setting-row .mb-input-base { margin-left:auto; }
+        /* 列内居中：标签固定 110px 靠左，其余控件（输入框 / 下拉 / 色块 / 复选框）统一在
+           「标签右侧的剩余空间」里水平居中，两列控件的中线对齐；
+           以前是输入框贴右、复选框贴标签，同一列里两套对齐规则混着，右边缘参差不齐 */
+        .mb-setting-row .mb-input-base { margin-left:auto; margin-right:auto; }
         .mb-setting-row label { width:110px;color:var(--mb-text-muted);font-size:var(--mb-font-md);flex-shrink:0;text-align:left; }
-        .mb-setting-row > *:not(label) { margin-left:0;margin-right:auto; }
+        .mb-setting-row > *:not(label) { margin-left:auto; margin-right:auto; }
+        /* 窄屏模式「新」角标：给从 v1.3 升级上来的用户一个提示，亮到 2026-11-24 23:59:59
+           （v1.4 发布日 11-09 起 15 天）。到点只是条件不成立、不再渲染，不写存储、不改开关 */
+        .mb-new-badge { display:inline-block;margin-left:4px;padding:0 4px;border-radius:3px;background:#e5534b;color:#fff;font-size:10px;line-height:14px;font-weight:600;vertical-align:1px; }
         /* 通用输入框基础类：边框、圆角、字号、背景 */
         .mb-input-base { border:1px solid var(--mb-border); border-radius:var(--mb-radius); font-size:var(--mb-font-md); box-sizing:border-box; background:var(--mb-bg-page); outline:none; transition:border-color var(--mb-t-base), box-shadow var(--mb-t-base); padding:6px 10px; width:75px; }
         .mb-input-base:focus { border-color:var(--mb-accent); box-shadow:0 0 0 3px var(--mb-accent-soft); }
@@ -3943,6 +3992,9 @@
         const kantuCfg = Util.storage.get('mengbao.kantu.config', DEFAULTS.kantu);
         const guolvCfg = Util.userStore.get('mengbao.guolv.config', DEFAULTS.guolv);
         const sortCfg = Util.storage.get('mengbao.sort.config', DEFAULTS.sort);
+        // 已读标记三态：沿用旧的两个布尔键合成，不新增存储键，老用户配置零迁移
+        const browseMode = !Util.storage.get('mengbao.browse.enabled', true) ? 'off'
+                         : (Util.storage.get('mengbao.browse.strike', true) ? 'strike' : 'gray');
         const favoriteUsers = Util.userStore.get('mengbao.zengqiang.favorite_users', {});
         const favUserCount = Object.keys(favoriteUsers).length;
         const favGroupCount = (Util.userStore.get('mengbao.zengqiang.favorite_groups', []) || []).length;
@@ -3968,16 +4020,20 @@
                 </h4>
                 <div class="mb-setting-grid">
                     <div class="mb-setting-row">
-                        <label title="开启后，浏览过的帖子自动变灰划线（已读标记）">已读帖子标记：</label>
-                        <input type="checkbox" class="set-browse-enabled mb-setting-checkbox" ${Util.storage.get('mengbao.browse.enabled', true) ? 'checked' : ''} style="cursor:pointer;" title="开启后，浏览过的帖子自动变灰划线（已读标记）">
+                        <label title="开启后把论坛版心压到 960（旧版宽度）。只在论坛「窄」档生效，切到全屏档会自动放开；切换后建议刷新一次页面让分页等信息重新排布">窄屏模式${Date.now() <= new Date('2026-11-24T23:59:59+08:00').getTime() ? '<span class="mb-new-badge">新</span>' : ''}：</label>
+                        <input type="checkbox" class="set-narrow-enabled mb-setting-checkbox" ${Util.storage.get('mengbao.narrow.enabled', false) ? 'checked' : ''} style="cursor:pointer;" title="把论坛版心压到 960（旧版宽度），仅在窄档生效">
+                    </div>
+                    <div class="mb-setting-row">
+                        <label title="浏览过的帖子怎么标记：关闭 / 变灰并划线 / 只变灰不划线">已读帖子：</label>
+                        <select class="set-browse-mode mb-input-base">
+                            <option value="off" ${browseMode === 'off' ? 'selected' : ''}>关闭</option>
+                            <option value="strike" ${browseMode === 'strike' ? 'selected' : ''}>变灰划线</option>
+                            <option value="gray" ${browseMode === 'gray' ? 'selected' : ''}>只变灰</option>
+                        </select>
                     </div>
                     <div class="mb-setting-row">
                         <label title="开启后自动按发帖时间倒序排列所有板块的帖子">按发帖时间排序：</label>
                         <input type="checkbox" class="set-sort-enabled mb-setting-checkbox" ${sortCfg.enabled ? 'checked' : ''} style="cursor:pointer;" title="开启后自动按发帖时间倒序排列所有板块的帖子">
-                    </div>
-                    <div class="mb-setting-row">
-                        <label title="关闭后已读帖子标题不再加删除线，只保留底色与灰字（更轻）">已读加删除线：</label>
-                        <input type="checkbox" class="set-browse-strike mb-setting-checkbox" ${Util.storage.get('mengbao.browse.strike', true) ? 'checked' : ''} style="cursor:pointer;">
                     </div>
                     <div class="mb-setting-row"><label title="已读帖子的整行底色，只对未收藏的帖子生效（收藏行仍是蓝色高亮）">已读标记底色：</label><input type="color" class="set-browse-color mb-input-base" value="${Util.escapeHtml(Util.storage.get('mengbao.browse.color', '#f0f0f0'))}"></div>
                     <div class="mb-setting-row"><label title="自动翻页时的等待间隔（秒），防止请求过快被封">翻页延时（秒）：</label><input type="number" class="set-fanye-delay mb-input-base" value="${Util.storage.get('mengbao.fanye.delaySec', 5)}" min="0" max="10"></div>
@@ -4016,15 +4072,25 @@
     // ===================== 设置保存 =====================
     function saveSettings(container) {
         const sortBefore = !!(Util.storage.get('mengbao.sort.config', Cfg.def('mengbao.sort.config')) || {}).enabled;
+        const narrowBefore = !!Util.storage.get('mengbao.narrow.enabled', false);
         const sortEnabled = container.querySelector('.set-sort-enabled');
         if (sortEnabled) Util.storage.set('mengbao.sort.config', { enabled: sortEnabled.checked });
 
-        const browseEnabled = container.querySelector('.set-browse-enabled');
-        if (browseEnabled) Util.storage.set('mengbao.browse.enabled', browseEnabled.checked);
+        // 已读三态：一个下拉拆回两个布尔键，存储结构不变，旧版回退也能读
+        const browseModeEl = container.querySelector('.set-browse-mode');
+        if (browseModeEl) {
+            const mode = ['off', 'strike', 'gray'].includes(browseModeEl.value) ? browseModeEl.value : 'strike';
+            Util.storage.set('mengbao.browse.enabled', mode !== 'off');
+            Util.storage.set('mengbao.browse.strike', mode === 'strike');
+        }
+        // 窄屏模式：立即切 class 与变量，不必等刷新
+        const narrowEl = container.querySelector('.set-narrow-enabled');
+        if (narrowEl) {
+            Util.storage.set('mengbao.narrow.enabled', narrowEl.checked);
+            applyNarrowMode(narrowEl.checked);
+        }
         const browseColor = container.querySelector('.set-browse-color');
         if (browseColor) Util.storage.set('mengbao.browse.color', Util.isValidColor(browseColor.value.trim()) ? browseColor.value.trim() : '#f0f0f0');
-        const browseStrike = container.querySelector('.set-browse-strike');
-        if (browseStrike) Util.storage.set('mengbao.browse.strike', browseStrike.checked);
 
         const oldKantu = Util.storage.get('mengbao.kantu.config', DEFAULTS.kantu);
         const kantuNew = {};
@@ -4049,8 +4115,48 @@
         applyRuntimeSettings();
         // 排序靠 URL 参数（filter=author&orderby=dateline）实现，前端改不了现有页面，只能刷新后重走
         const sortChanged = !!sortEnabled && sortEnabled.checked !== sortBefore;
-        Util.toast(sortChanged ? '设置已保存，按发帖时间排序会在刷新后生效' : '设置已保存', 2000, 'success');
+        // 窄屏是当场切 class + CSS 变量，保存就已经生效了，所以单独说明一句；
+        // 排序要刷新才生效，两项都改的时候只说窄屏，避免一句 toast 塞两条互相矛盾的时序
+        const narrowChanged = !!narrowEl && narrowEl.checked !== narrowBefore;
+        let savedTip = '设置已保存';
+        if (narrowChanged) {
+            savedTip += narrowEl.checked
+                ? '，窄屏模式已开启（版块列表、导读、帖子、搜索页' + (isNarrowEligible() ? '，当前页已生效' : '，当前页不适用') + '）'
+                : '，窄屏模式已关闭';
+        }
+        else if (sortChanged) savedTip += '，按发帖时间排序会在刷新后生效';
+        Util.toast(savedTip, 2200, 'success');
     }
+
+    // 窄屏只服务阅读类页面（白名单）：版块列表 pg_forumdisplay、导读 pg_guide（各子视图实测同 class）、
+    // 帖子 pg_viewthread，以及搜索页——搜索页的 body 实测没有 class，只能按路径认。
+    // 用白名单而不是"全站开、再列排除"，是因为论坛以后新增的页面默认就不会被压成 960。
+    function isNarrowEligible() {
+        if (location.pathname.indexOf('search.php') > -1) return true;
+        const cls = document.body ? String(document.body.className) : '';
+        return /pg_forumdisplay|pg_guide|pg_viewthread/.test(cls);
+    }
+
+    // 窄屏模式：给 html 挂 class 并覆盖 --mb-page-width；CSS 侧用 :not(.widthauto) 保证只在论坛窄档生效
+    function applyNarrowMode(on) {
+        const d = document.documentElement;
+        if (!d) return;   // document-start 极端情况下 html 尚未建好
+        const active = !!on && isNarrowEligible();
+        d.classList.toggle('mb-narrow-mode', active);
+        d.style.setProperty('--mb-page-width', active ? '960px' : '1200px');
+    }
+    // 启动即应用一次，否则装了脚本要等进设置保存才生效。
+    // 判断依赖 body.class，document-start 时 body 还没建好，所以推迟到 DOM 就绪再判。
+    (function bootNarrowMode() {
+        try {
+            const on = Util.storage.get('mengbao.narrow.enabled', false);
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', function () { applyNarrowMode(on); }, { once: true });
+            } else {
+                applyNarrowMode(on);
+            }
+        } catch (e) {}
+    })();
 
     // 依赖 CSS 变量 / 行 class 的设置当场应用，不必等刷新
     function applyRuntimeSettings() {
@@ -5267,6 +5373,10 @@
             if (!/mod=space\b/.test(location.href)) return false;
             const m = location.href.match(/[?&]do=([a-z]+)/i);
             if (!m) return true;                                  // home.php?mod=space&uid=x
+            // view=me 是自己名下的列表页（我的帖子 / 我的收藏 / 我的好友…），不是谁的资料页。
+            // 这类页面里同样找得到指向自己 uid 的用户名链接，之前会被当成资料页、
+            // 把收藏星标挂到顶部用户名容器上，于是页面最上方凭空多出一个星星。
+            if (/[?&]view=me\b/.test(location.href)) return false;
             return /^(profile|thread)$/.test(m[1].toLowerCase());  // 资料页 / 个人主题页
         };
         // 取当前资料页用户的 uid：URL 有就用，没有就从 #uhd 里带 uid 的链接反查
@@ -5525,6 +5635,7 @@
                 + '<div class="mb-guide-row">🖼️ 看图球：左键开启图片预览 ｜ 右键停止加载并收起（缓存保留）</div>'
                 + '<div class="mb-guide-row">⚡ 增强球：左键功能面板（画廊/收藏/评分…）｜ 右键评论面板</div>'
                 + '<div class="mb-guide-row">🎨 蓝底行 = 你收藏的用户发帖 ｜ 变色行 = 你已读过的帖（底色与划线可在设置里调）</div>'
+                + '<div class="mb-guide-row">🖥️ 窄屏模式：想把论坛版心压回 3.4 时代的 960 宽，去设置里勾「窄屏模式」（默认关闭）</div>'
                 + '<div class="mb-guide-hint">提示：所有球都可拖动，拖到屏幕边缘会自动校正位置</div>'
                 + '<button type="button" class="mb-guide-ok">知道了</button>';
             const ok = card.querySelector('.mb-guide-ok');
@@ -5670,7 +5781,7 @@
         // 主 CDN（jsDelivr）未加载成功，fallback 到 unpkg
         log('warn', '主 CDN Vue 未加载，尝试 fallback 到 unpkg...');
         const fallback = document.createElement('script');
-        fallback.src = 'https://unpkg.com/vue@3/dist/vue.global.js';
+        fallback.src = 'https://unpkg.com/vue@3/dist/vue.global.prod.js';
         fallback.onload = () => {
             log('debug', 'fallback Vue 加载成功');
             boot(); // 递归调用，此时 Vue 已加载
