@@ -9,8 +9,8 @@
 // ==UserScript==
 // @name         萌宝小秘书
 // @namespace    https://violentmonkey.mengbao.local/
-// @version      1.0
-// @description  Discuz 论坛增强套件：图片画廊预览、搜索过滤、自动翻页、收藏用户与帖子、评论侧边面板、浏览历史标记、自定义头像
+// @version      1.1
+// @description  Discuz 论坛增强套件：图片画廊预览、大图查看器、搜索过滤、自动翻页、收藏用户与帖子、评论侧边面板、评分自动满分、浏览历史标记、自定义头像
 // @author       Slient_桃萌
 // @icon         https://aka.doubaocdn.com/s/ZHcpkVi54s
 // @license      MIT
@@ -935,8 +935,10 @@
         .mb-gallery-go { position:absolute;bottom:6px;right:6px;background:rgba(255,255,255,0.85);color:var(--mb-accent-deep);font-size:var(--mb-font-sm);padding:4px 8px;border-radius:var(--mb-radius);cursor:pointer;opacity:0.85;z-index:2;display:flex;align-items:center;gap:4px;user-select:none;outline:none;backdrop-filter:blur(4px);transition:opacity var(--mb-t-fast); }
         .mb-gallery-cell:hover .mb-gallery-go { opacity:1; }
         .mb-gallery-go:hover { background:var(--mb-bg-page); }
-        .mb-single-view { position:fixed;inset:0;background:rgba(0,0,0,0.9);display:none;align-items:center;justify-content:center;z-index:var(--mb-z-single); }
-        .mb-single-view img { max-width:100%;max-height:100%;object-fit:contain;z-index:1; }
+        .mb-single-view { position:fixed;inset:0;background:rgba(0,0,0,0.82);display:none;align-items:center;justify-content:center;z-index:var(--mb-z-single);box-sizing:border-box;padding:76px 56px 104px; }
+        .mb-single-bar { position:absolute;top:0;left:0;right:0;height:52px;display:flex;align-items:center;gap:8px;padding:0 20px;box-sizing:border-box;background:linear-gradient(180deg,rgba(0,0,0,0.82) 0%,rgba(0,0,0,0.58) 58%,rgba(0,0,0,0) 100%);box-shadow:inset 0 -1px 0 rgba(255,255,255,0.08);z-index:12;cursor:pointer;transition:background var(--mb-t-base) ease; }
+        .mb-single-bar:hover { background:linear-gradient(180deg,rgba(0,0,0,0.88) 0%,rgba(0,0,0,0.66) 58%,rgba(0,0,0,0) 100%); }
+        .mb-single-view img { max-width:none;max-height:none;flex:none;object-fit:contain;z-index:1;cursor:default;transition:transform var(--mb-t-base) ease;user-select:none;-webkit-user-drag:none; }
         .mb-single-loading { position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); color:var(--mb-text-on-accent); z-index:2; }
         .mb-single-loading::before { content:''; display:inline-block; width:40px; height:40px; border:3px solid var(--mb-text-on-accent); border-top-color:transparent; border-radius:50%; animation:mb-spin 0.8s linear infinite; margin-right:12px; vertical-align:middle; }
         .mb-single-slow { display:none; margin-left:12px; vertical-align:middle; font-size:var(--mb-font-md); white-space:nowrap; }
@@ -956,9 +958,11 @@
             border-radius: var(--mb-radius-sm) !important;
             cursor: zoom-in !important;
         }
-        .mb-single-counter { position:absolute;top:20px;left:20px;background:rgba(255,255,255,0.2);color:var(--mb-text-on-accent);padding:8px 16px;border-radius:var(--mb-radius);font-size:var(--mb-font-md);z-index:10;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);user-select:none; }
-        .mb-gallery-rotate-btn { position:absolute;top:20px;right:20px;z-index:10;width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,0.15);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;cursor:pointer; }
-        .mb-gallery-rotate-btn:hover { background:rgba(255,255,255,0.25); }
+        .mb-single-counter { background:none;padding:0;color:rgba(255,255,255,0.92);font-size:13px;font-weight:500;letter-spacing:0.3px;text-shadow:0 1px 2px rgba(0,0,0,0.65);user-select:none;white-space:nowrap;margin-right:auto;pointer-events:none; }
+        .mb-single-btn { width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.28);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:background var(--mb-t-base) ease,border-color var(--mb-t-base) ease; }
+        .mb-single-btn:hover { background:rgba(255,255,255,0.22); border-color:rgba(255,255,255,0.55); }
+        .mb-single-btn.mb-close { background:rgba(0,0,0,0.35); }
+        .mb-single-btn.mb-close:hover { background:#e5534b; border-color:#e5534b; }
         .mb-setting-section { margin:0 16px; }
         .mb-setting-section h4 { margin:0 0 10px;font-weight:600;font-size:var(--mb-font-title);color:var(--mb-text-primary); }
         .mb-setting-section h4 { padding-left:8px; border-left:3px solid var(--mb-accent); line-height:1.3; }
@@ -1664,10 +1668,10 @@
                 <div class="mb-gallery-grid"></div>
             </div>
             <div class="mb-single-view">
+                <div class="mb-single-bar"><div class="mb-single-counter"></div></div>
                 <img>
                 <div class="mb-single-loading"><span class="mb-single-slow">原图较大，正在加载…</span></div>
                 <div class="mb-single-fail">图片加载失败</div>
-                <div class="mb-single-counter"></div>
             </div>`;
             // 标题清洗：取第一个 " - " 之前部分；使用 textContent，避免注入
             let cleanTitle = postTitle || '帖子图片画廊';
@@ -1678,6 +1682,7 @@
             const single = mask.querySelector('.mb-single-view');
             const bigImg = mask.querySelector('.mb-single-view img');
             const counter = mask.querySelector('.mb-single-counter');
+            const singleBar = mask.querySelector('.mb-single-bar');
             const galleryBox = mask.querySelector('.mb-gallery-box');
             let currentIdx = startIndex;
             let singleSlowTimer = null;   // 单图慢加载提示定时器，跨 showSingle 调用只留一个
@@ -1686,7 +1691,7 @@
             const showSingle = (idx) => {
                 if (!Util.storage.get('mengbao.gallery.hintShown', false)) {
                     Util.storage.set('mengbao.gallery.hintShown', true);
-                    Util.toast('💡 滚轮切换图片 · Ctrl+滚轮缩放 · 点背景返回网格 · 底部缩略图可跳转', 4000, 'kantu');
+                    Util.toast('💡 滚轮切换图片 · Ctrl+滚轮缩放 · 双击图片或点顶部条退出 · Esc 也可关闭', 4000, 'kantu');
                 }
                 currentIdx = (idx + imgArr.length) % imgArr.length;
                 // 切换图片时，先显示加载中，隐藏大图
@@ -1820,16 +1825,15 @@
             document.addEventListener('keydown', onGalleryKey);
             mask._mbCleanup = closeGallery;
             const rotateBtn = document.createElement('span');
-            rotateBtn.className = 'mb-gallery-rotate-btn';
+            rotateBtn.className = 'mb-single-btn';
             rotateBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>';
             rotateBtn.title = '旋转90°';
             rotateBtn.onclick = (e) => { e.stopPropagation(); rotate += 90; applyTransform(); };
-            single.appendChild(rotateBtn);
+            singleBar.appendChild(rotateBtn);
             
             // 回到原位置按钮（用X关闭图标，更明显）
             const backBtn = document.createElement('span');
-            backBtn.className = 'mb-gallery-rotate-btn';
-            backBtn.style.right = '80px';
+            backBtn.className = 'mb-single-btn mb-close';
             // 样式和旋转按钮一致，只靠图标区分
             backBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
             backBtn.title = '关闭并回到原位置';
@@ -1838,10 +1842,8 @@
                 // 点击X按钮：回到最初点击的图片位置（originImg）
                 closeGallery(true); // 传入true表示回到原位置
             };
-            // 只有从详情页直接进入（fromThread=true）才显示X按钮
-            if (fromThread) {
-                single.appendChild(backBtn);
-            }
+            //          关闭按钮常驻：任何入口进大图都必须有可见的退出键
+            singleBar.appendChild(backBtn);
 
             // 先定义cellObjs，放在外面，这样single.onclick也能访问到
             const cellObjs = [];
@@ -1968,13 +1970,24 @@
                     setTimeout(() => cell.classList.remove('mb-flash-ring'), 1500);
                 }
             }
-            single.onclick = (e) => { 
-                if (e.target === single) {
-                    // 点背景都直接关闭；只有从网格视图点进来（direct=false）才退回网格
-                    if (fromThread || direct) closeGallery();
-                    else backToGrid();
-                }
+            // ===== 单图交互：原尺寸显示 / 双击图片或点顶部条退出 / Esc 关闭 =====
+            const exitSingle = () => {
+                if (fromThread || direct) closeGallery();
+                else backToGrid();
             };
+            // 双击图片退出（单击不再退出，避免误触）
+            bigImg.addEventListener('dblclick', (e) => {
+                e.stopPropagation();
+                exitSingle();
+            });
+            // 点背景退出：原尺寸下只有小图四周才点得到背景
+            single.onclick = (e) => {
+                if (e.target === single) exitSingle();
+            };
+            // 顶部条整条可点退出；条内按钮自带 stopPropagation，不会误触
+            singleBar.addEventListener('click', (e) => {
+                if (e.target === singleBar) exitSingle();
+            });
             document.body.appendChild(mask);
             //          （「首张直入大图不亮、翻一张才亮」的根因就是挂载前调用了 showSingle）
             if (direct) showSingle(startIndex);
@@ -3471,10 +3484,22 @@
             if (payLink) addBtn('💰 购买', () => payLink.click(), '跳转到购买/付费内容');
             const replyLink = document.querySelector('.locked a[href*="action=reply"]');
             if (replyLink) addBtn('🔒 回复', () => replyLink.click(), '跳转到回复（需先解锁主题）');
-            const codeBlock = document.querySelector('.blockcode');
-            if (codeBlock) addBtn('🧲 链接', () => codeBlock.scrollIntoView({ behavior: 'smooth', block: 'center' }), '滚动到本帖的链接/隐藏内容区');
-            document.querySelectorAll('span[id^=attach_]').forEach(el => {
-                addBtn('📎 附件', () => el.scrollIntoView({ behavior: 'smooth', block: 'center' }), '滚动到本帖的附件区');
+            // 滚动定位：点击时才实时查目标（页面重排后旧引用会悬空），并手动算居中位置（不依赖 scrollIntoView 的容器判定）
+            const scrollToTarget = (target) => {
+                if (!target || typeof target.getBoundingClientRect !== 'function') return;
+                const r = target.getBoundingClientRect();
+                if (!r.height && !r.width) return;
+                const top = r.top + window.scrollY - Math.max(0, (window.innerHeight - r.height) / 2);
+                try { window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' }); }
+                catch (e) { window.scrollTo(0, Math.max(0, top)); }
+            };
+            const findLinkBlock = () => document.querySelector('.blockcode') || document.querySelector('.hidecontent');
+            if (findLinkBlock()) addBtn('🧲 链接', () => scrollToTarget(findLinkBlock()), '滚动到本帖的链接/隐藏内容区');
+            document.querySelectorAll('[id^=attach_]').forEach(el => {
+                if (!/^attach_\d+$/.test(el.id)) return;              // 排除 attach_xxx_menu / attach_tblheader 这类辅助节点
+                if (!el.offsetHeight && !el.offsetWidth) return;      // 排除隐藏节点，避免生成点了没反应的按钮
+                const aid = el.id;
+                addBtn('📎 附件', () => scrollToTarget(document.getElementById(aid)), '滚动到本帖的附件区');
             });
             this.syncGalleryFabActive();
         },
@@ -3577,17 +3602,79 @@
                     }
                 }
             };
+            // 重复评分只做状态标记，不弹提示：论坛原生弹窗已经把原因说清楚了
+            const markRatedQuiet = () => {
+                if (self._rateResolved) return;
+                self._rateResolved = true;
+                if (self._rateObserver) { self._rateObserver.disconnect(); self._rateObserver = null; }
+                if (tid) { self.ratedThreads[tid] = true; self.saveRatedThreads(); btn.classList.add('mb-active'); }
+            };
             // 观察评分窗口出现，窗口 HTML 注入后 hook 原生回调
             this._rateObserver = new MutationObserver(() => {
                 if (self._rateResolved) return;
                 const alertErr = document.querySelector('.alert_error');
                 if (alertErr && (alertErr.innerText || '').includes('重复评分')) {
-                    resolve(true, 'info');
+                    markRatedQuiet();
                     return;
                 }
                 const rateForm = document.querySelector('#rateform');
                 if (rateForm && !rateForm._mbRateHooked) {
                     rateForm._mbRateHooked = true;
+                    // ===== 评分自动填最高分 =====
+                    //   上限：优先 #scoreoption{后缀} 的 li（文本形如 “+2”，剥掉非数字后取最大），
+                    //   没有选项列表则退回同一行“评分区间”单元格里的 “~ N”。
+                    //   论坛评分窗口是 ajax 注入，个别模板注入后会把输入框再重置一次，
+                    //   所以填完再校验两轮；用户一旦手动改过分（键盘输入或点 ^ 下拉选择），立即停手。
+                    if (!rateForm._mbScoreFilled) {
+                        rateForm._mbScoreFilled = true;
+                        // 读某个评分字段的上限
+                        const readMax = (inp) => {
+                            const suffix = inp.name.replace(/^score/, '');
+                            let maxVal = null;
+                            const optList = rateForm.querySelector('#scoreoption' + suffix);
+                            if (optList) {
+                                optList.querySelectorAll('li').forEach(li => {
+                                    const n = parseInt((li.textContent || '').replace(/[^0-9]/g, ''), 10);
+                                    if (Number.isFinite(n) && n > 0) maxVal = (maxVal === null || n > maxVal) ? n : maxVal;
+                                });
+                            }
+                            if (maxVal === null) {
+                                const cell = inp.closest('td');
+                                const row = cell ? cell.parentElement : null;
+                                if (row) {
+                                    row.querySelectorAll('td').forEach(td => {
+                                        const m = (td.textContent || '').match(/[~～]\s*(\d+)/);
+                                        if (m) {
+                                            const n = parseInt(m[1], 10);
+                                            if (Number.isFinite(n) && n > 0) maxVal = (maxVal === null || n > maxVal) ? n : maxVal;
+                                        }
+                                    });
+                                }
+                            }
+                            return maxVal;
+                        };
+                        const applyMax = () => {
+                            if (rateForm._mbScoreUserEdited) return;
+                            rateForm.querySelectorAll('input[name^="score"]').forEach(inp => {
+                                const maxVal = readMax(inp);
+                                if (maxVal !== null && maxVal > 0 && String(maxVal) !== inp.value) {
+                                    inp.value = String(maxVal);
+                                }
+                            });
+                        };
+                        // 用户改分后永久停手：键盘输入走 input 事件，点 ^ 展开/点选项走 click
+                        const stopAutoFill = () => { rateForm._mbScoreUserEdited = true; };
+                        rateForm.addEventListener('input', stopAutoFill, true);
+                        rateForm.addEventListener('click', (e) => {
+                            const t = e.target;
+                            if (t && t.closest && (t.closest('.dpbtn') || t.closest('ul[id^="scoreoption"]'))) stopAutoFill();
+                        }, true);
+                        applyMax();
+                        // 注入后再校验两轮，压住论坛脚本的重置（表格移除后不再补写）
+                        [250, 900].forEach(ms => setTimeout(() => {
+                            if (document.body.contains(rateForm)) applyMax();
+                        }, ms));
+                    }
                     // ---- 保存论坛原版 succeedhandle_rate（此时窗口 HTML 已注入，论坛版已定义） ----
                     // pageWin 上的原版函数是共享的，不认标记的话第 N 次点开就套了 N 层包装
                     const prevSucceed = pageWin.succeedhandle_rate;
@@ -3607,7 +3694,13 @@
                     pageWin.succeedhandle_rate.__mbOrig = origSucceed;
                     // ---- 定义 errorhandle_rate（初始 undefined，我们定义后服务器错误返回会调用） ----
                     pageWin.errorhandle_rate = function (msg) {
-                        Util.toast('评分失败：' + (msg || '未知错误'), 2000, 'error');
+                        const text = msg || '';
+                        // 重复评分：原生弹窗负责提示，脚本只标按钮，不再叠一条 toast
+                        if (text.includes('重复评分') || text.includes('不能对同一个帖子')) {
+                            markRatedQuiet();
+                            return;
+                        }
+                        Util.toast('评分失败：' + (text || '未知错误'), 2000, 'error');
                     };
                 }
             });
@@ -5066,29 +5159,21 @@
             if (!Util.storage.get('mengbao.browse.enabled', true)) return;
             const h = this.get();
             Util.log('debug', '[已读标记] bucket=' + Util.userStore.curBucket() + ' 历史条数=' + Object.keys((h.data || {})).length);
-            document.querySelectorAll('.tl tr:has(td.icn)').forEach(tbody => {
-                const a = tbody.querySelector('a[href*="mod=viewthread"], a[href*="tid="], a[href*="thread-"]');
-                const tid = this._extractTid(a);
-                if (tid && h.data[tid]) tbody.classList.add('mb-browsed');
-            });
-
-            const pbwRows = document.querySelectorAll('#threadlist .pbw');
-            pbwRows.forEach((row, i) => {
-                const a = row.querySelector('a[href*="tid="], a[href*="mod=viewthread"], a[href*="thread-"]');
-                const tid = this._extractTid(a);
-                Util.log('debug', '[已读标记] pbw#' + i + ' tid=' + tid + ' 命中=' + !!(tid && h.data[tid]) + ' 链接=' + (a ? a.href.slice(0, 100) : '(无)'));
-                if (tid && h.data[tid]) row.classList.add('mb-browsed');
-            });
+            // 版块列表页（.tl 表格）/ 个人主题页（.tl 表格，无 td.icn）/ 搜索结果页（#threadlist .pbw）统一按行处理
+            const markRows = (hist) => {
+                document.querySelectorAll('.tl tr, #threadlist .pbw').forEach(row => {
+                    if (row.classList.contains('mb-browsed')) return;
+                    const a = row.querySelector('a[href*="mod=viewthread"], a[href*="tid="], a[href*="thread-"]');
+                    const tid = this._extractTid(a);
+                    if (tid && hist.data[tid]) row.classList.add('mb-browsed');
+                });
+            };
+            markRows(h);
+            // 论坛 ajax 注入 / 脚本追加行后补标
             [500, 1500].forEach(ms => setTimeout(() => {
                 try {
                     if (!Util.storage.get('mengbao.browse.enabled', true)) return;
-                    const h2 = this.get();
-                    document.querySelectorAll('#threadlist .pbw').forEach(row => {
-                        if (row.classList.contains('mb-browsed')) return;
-                        const a = row.querySelector('a[href*="tid="], a[href*="mod=viewthread"], a[href*="thread-"]');
-                        const tid = this._extractTid(a);
-                        if (tid && h2.data[tid]) row.classList.add('mb-browsed');
-                    });
+                    markRows(this.get());
                 } catch (e) {}
             }, ms));
         }
@@ -5151,7 +5236,7 @@
                     const m = location.href.match(/tid=(\d+)/) || location.href.match(/thread-(\d+)-/);
                     if (m) BrowseHistory.set(m[1]);
                 }
-                if (isForumListPage() || isSearchResultPage()) {
+                if (isForumListPage() || isSearchResultPage() || isSpaceThreadPage()) {
                     BrowseHistory.markList();
                     // 监听帖子链接的点击事件，点击时立即标记为已读
                     document.addEventListener('click', (e) => {
@@ -5161,7 +5246,7 @@
                         if (m) {
                             BrowseHistory.set(m[1]);
                             // 立即给这个帖子行添加已读标记
-                            const row = a.closest('.tl tr:has(td.icn)') || a.closest('#threadlist .pbw');
+                            const row = a.closest('.tl tr') || a.closest('#threadlist .pbw');
                             if (row) row.classList.add('mb-browsed');
                         }
                     });
@@ -5172,7 +5257,7 @@
         // 监听 pageshow 事件，当页面从 bfcache 恢复时，重新标记已读帖子
         window.addEventListener('pageshow', (e) => {
             if (e.persisted) {
-                if (isForumListPage() || isSearchResultPage()) BrowseHistory.markList();
+                if (isForumListPage() || isSearchResultPage() || isSpaceThreadPage()) BrowseHistory.markList();
             }
         });
         setTimeout(showFirstRunGuideIfNeeded, 1500);
