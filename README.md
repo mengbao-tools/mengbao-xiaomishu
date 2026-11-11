@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://cdn.jsdelivr.net/gh/mengbao-tools/mengbao-xiaomishu@v1.5/mengbao.user.js"><b>点此安装</b></a>
+  <a href="https://cdn.jsdelivr.net/gh/mengbao-tools/mengbao-xiaomishu@v1.6/mengbao.user.js"><b>点此安装</b></a>
 </p>
 
 ---
@@ -60,14 +60,14 @@ Discuz 这套界面十几年没大改，用久了有几个具体的别扭：图�
 
 **第二步**：点这个链接直接安装
 
-**[安装 萌宝小秘书 v1.5](https://cdn.jsdelivr.net/gh/mengbao-tools/mengbao-xiaomishu@v1.5/mengbao.user.js)**
+**[安装 萌宝小秘书 v1.6](https://cdn.jsdelivr.net/gh/mengbao-tools/mengbao-xiaomishu@v1.6/mengbao.user.js)**
 
 管理器会弹出安装确认页，点「安装」即可。装完刷新论坛页面，左边会停着一两颗小圆球——具体几颗看你在哪一页，见下面的「快速上手」。
 
 也可以在管理器里手动填地址（下面和上面是同一个文件）：
 
 ```
-https://cdn.jsdelivr.net/gh/mengbao-tools/mengbao-xiaomishu@v1.5/mengbao.user.js
+https://cdn.jsdelivr.net/gh/mengbao-tools/mengbao-xiaomishu@v1.6/mengbao.user.js
 ```
 
 **如果点了没弹安装框、只跳到一个显示代码的页面**：说明管理器没接管这次请求，按下面的办法手动添加。
@@ -79,7 +79,7 @@ https://cdn.jsdelivr.net/gh/mengbao-tools/mengbao-xiaomishu@v1.5/mengbao.user.js
 **如果 jsDelivr 打不开**（偶发抽风），把地址换成 raw，内容完全一样：
 
 ```
-https://raw.githubusercontent.com/mengbao-tools/mengbao-xiaomishu/v1.5/mengbao.user.js
+https://raw.githubusercontent.com/mengbao-tools/mengbao-xiaomishu/v1.6/mengbao.user.js
 ```
 
 再不行就退回最原始的办法：用浏览器打开上面这条 raw 地址，全选复制整段脚本 → 在管理器里「新建脚本」→ 清空默认内容 → 粘贴 → 保存。
@@ -118,6 +118,7 @@ https://raw.githubusercontent.com/mengbao-tools/mengbao-xiaomishu/v1.5/mengbao.u
 - **看图**：画廊背景色、卡片色、收藏高亮色、预览图数量与高度
 - **收藏**：收藏馆入口、分组管理
 - **工具**：头像设置、重置位置、清除缓存、导出/导入配置、恢复默认
+- **白名单**：脚本只在你添加到白名单的站点生效。不在白名单的站点也能从菜单里的「白名单管理」单独加域名，不用先进论坛；「恢复默认」不会清空白名单
 
 颜色类设置**保存即生效**，不用刷新。只有「按发帖时间排序」和域名白名单需要刷一次页面——它们要重新请求一个排好序的页面，不是前端能改的。
 
@@ -127,19 +128,17 @@ https://raw.githubusercontent.com/mengbao-tools/mengbao-xiaomishu/v1.5/mengbao.u
 
 脚本的元数据里配了 `@updateURL`，管理器会定期检查新版本并提示更新。
 
-安装链接用的是固定版本地址（`@v1.5` 这种），不经 `@main`，装到的就是对应版本的原文，不受 CDN 缓存影响。
+安装链接用的是固定版本地址（`@v1.6` 这种），不经 `@main`，装到的就是对应版本的原文，不受 CDN 缓存影响。
 
 需要知道的一点：`@updateURL` 指向的是 `@main`，而 jsDelivr 对 `@main` 最长有 12 小时缓存。所以**已装用户收到更新提示的时间**会比实际发布会晚一些，这属正常，已经装好的版本不受影响。
 
-想立刻用上新版，直接装带版本号的地址就行，比如 `…@v1.5/mengbao.user.js`——它锁定的是那一版，不受缓存影响。
+想立刻用上新版，直接装带版本号的地址就行，比如 `…@v1.6/mengbao.user.js`——它锁定的是那一版，不受缓存影响。
 
 ## 更新日志
 
 完整版本记录见 [CHANGELOG.md](CHANGELOG.md)。
 
-当前版本 **v1.5**。个人主题页与回复页能正常显示并操作收藏星标；收藏之后名字会跟着变蓝；评论面板跳转不再被顶部条压住、追加的评论也会染色；看图进度不再出现「278/270」这种分子越过分母的显示；手动点过论坛自带的「下一页」之后，脚本翻页不再报「翻页网络错误，连接被中断」。此外还修了：旧版（1.0）导出的配置备份可以正常导入、导出更干净；资料页收藏星标回到头像旁；评论面板总页数异常时按回复数重算；权限不足的帖子不再反复重试。
-
-从 v1.0 到 v1.4 的历史版本，脚本原件与说明见 [Releases](https://github.com/mengbao-tools/mengbao-xiaomishu/releases)。
+当前版本 **v1.6**。新增预览块全挂自动重载（图床连接被重置时自动重连一次，恢复就正常出图、不弹提示）；白名单管理独立入口，非白名单站点也能自助加白；「恢复出厂设置」不再清空白名单。修了与其它脚本争抢排序参数导致的页面反复刷新、预览图取链把相对路径当绝对地址、慢图晚解码后条带停在起点高度、白名单乱填被当成清空、恢复默认跨账号清空、点帖子图片退回原生看图、限流只报「网络错误」、原帖图失效时提示像整页故障、跨账号导入串号等问题。观感上把预览块展开时机提前到「浏览器解出尺寸」，起点高度到 120px，占位块加了可辨认的描边。从 v1.0 到 v1.4 的历史版本，脚本原件与说明见 [Releases](https://github.com/mengbao-tools/mengbao-xiaomishu/releases)。
 
 ## 常见问题
 
