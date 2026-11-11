@@ -5,11 +5,11 @@
 // 功能：图片画廊预览、搜索过滤、自动翻页、收藏用户与帖子、
 //       评论侧边面板、浏览历史标记、自定义头像、按时间排序
 // ============================================================
-
+// 版本：1.6
 // ==UserScript==
 // @name         萌宝小秘书
 // @namespace    https://violentmonkey.mengbao.local/
-// @version      1.5
+// @version      1.6
 // @updateURL    https://cdn.jsdelivr.net/gh/mengbao-tools/mengbao-xiaomishu@main/mengbao.js
 // @downloadURL  https://cdn.jsdelivr.net/gh/mengbao-tools/mengbao-xiaomishu@main/mengbao.js
 // @description  Discuz 论坛增强套件：图片画廊预览、大图查看器、搜索过滤、自动翻页、收藏用户与帖子、评论侧边面板、评分自动满分、浏览历史标记、自定义头像
@@ -39,18 +39,20 @@
     // ===================== 常量区 =====================
     const CONST = {
         DRAG_THRESHOLD: 3,            // 拖拽判定位移阈值（px）
+        SNAP_THRESHOLD: 10,           // 松手吸附阈值：与目标球 left 差 ≤ 10px 就对齐
         REQUEST_TIMEOUT: 15000,      // 单个请求超时（ms）
         QUEUE_CONCURRENCY: 2,         // 看图队列并发数
         QUEUE_TASK_TIMEOUT: 20000,    // 看图队列单任务硬上限（ms）：请求超时没兜住时由它兜底，超时即算完成
-        STALL_RESET_MS: 18000,        // 进度计数连续不动多久判定卡死（ms）：清残留 tid 并收尾，避免提示条永久挂着
-        LAZY_ROOT_MARGIN: '200px 0px',     // 图片懒加载观察边距
-        POST_ROOT_MARGIN: '300px 0px',      // 帖子懒加载观察边距
+        STALL_RESET_MS: 30000,        // 进度计数连续不动多久判定卡死（ms）：清残留 tid 并收尾，避免提示条永久挂着
+        LAZY_ROOT_MARGIN: '1200px 0px',    // 图片懒加载观察边距（约 1.3 屏，滑到之前基本已下完）
+        POST_ROOT_MARGIN: '2000px 0px',     // 帖子懒加载观察边距（约 2.2 屏，预览提前生成）
         LOADING_MIN_SHOW_MS: 1500,    // 加载提示最小展示时长
         POLL_INTERVAL_MS: 300,        // 完成状态轮询间隔
         RATE_OBSERVE_TIMEOUT_MS: 120000,// 评分观察兜底时限：2 分钟。成功提示可即时判定，超时仅作兜底（论坛评分回调可能延迟，不宜取小值）
-        CACHE_MAX_POSTS: 200,         // 看图预览持久化缓存上限（帖）
+        CACHE_MAX_POSTS: 500,         // 看图预览持久化缓存上限（帖）
         SORT_FILTER: 'author',
         SORT_ORDERBY: 'dateline',
+        KANTU_START_H: 120,           // 预览块占位起点高度（全挂帖的上限也是它）
         // 尺寸只认 CSS 变量（:root --mb-fab-size），JS 不再另写一份 44，免得改一处漏一处
         get FAB_SIZE() {
             if (this._fabSize == null) {
@@ -109,7 +111,7 @@
         'mengbao.fanye.delaySec':            { type: 'number',   def: 5, min: 0, max: 10, backup: true },
         'mengbao.debug':                     { type: 'boolean',  def: false, backup: true },
         'mengbao.browse.enabled':            { type: 'boolean',  def: true, backup: true },
-        'mengbao.browse.history':            { type: 'object',   def: { time: 0, data: {} }, validate: vOldOrNew(x => !!x && typeof x === 'object' && !Array.isArray(x) && typeof x.time === 'number' && !!x.data && typeof x.data === 'object' && !Array.isArray(x.data)) },
+        'mengbao.browse.history':            { type: 'object',   def: { time: 0, data: {} }, backup: true, validate: vOldOrNew(x => !!x && typeof x === 'object' && !Array.isArray(x) && typeof x.time === 'number' && !!x.data && typeof x.data === 'object' && !Array.isArray(x.data)) },
         'mengbao.browse.color':              { type: 'color',    def: '#f0f0f0', backup: true },
         'mengbao.browse.strike':             { type: 'boolean',  def: true, backup: true },
         'mengbao.narrow.enabled':            { type: 'boolean',  def: false, backup: true },
@@ -119,7 +121,7 @@
         'mengbao.kantu.cache':               { type: 'object',   def: {} },
         'mengbao.kantu.preload':             { type: 'number',   def: 3, min: 1, max: 12, backup: true, validate: vOldOrNew(x => typeof x === 'number' && Number.isFinite(x)) },
         'mengbao.kantu.thumbH':              { type: 'number',   def: 200, min: 120, max: 320, backup: true, validate: vOldOrNew(x => typeof x === 'number' && Number.isFinite(x)) },
-        'mengbao.avatars.user':              { type: 'array',    def: [], backup: true, validate: vOldOrNew(x => Array.isArray(x) && x.every(a => a === null || (!!a && typeof a === 'object' && typeof a.data === 'string' && /^data:image\//.test(a.data))) && x.filter(Boolean).length <= 9) },
+        'mengbao.avatars.user':              { type: 'array',    def: [], backup: false, validate: vOldOrNew(x => Array.isArray(x) && x.every(a => a === null || (!!a && typeof a === 'object' && typeof a.data === 'string' && /^data:image\//.test(a.data))) && x.filter(Boolean).length <= 9) },
         'mengbao.avatars.backup.v132':       { type: 'array',    def: [], backup: true, validate: vOldOrNew(x => Array.isArray(x)) },
         'mengbao.comment.avatarChoice':      { type: 'string',   def: '', backup: true, validate: vOldOrNew(x => typeof x === 'string') },
         'mengbao.comment.avatar':            { type: 'string',   def: '', backup: true, validate: vOldOrNew(x => typeof x === 'string' && (!x || /^(?:data:image\/|builtin:[12]$)/.test(x))) },
@@ -129,14 +131,14 @@
         'mengbao.comment.minLen':            { type: 'number',   def: 1, min: 1, max: 30, backup: true, validate: vOldOrNew(x => typeof x === 'number' && Number.isFinite(x)) },
         'mengbao.panel.nickname':            { type: 'string',   def: '萌宝', maxLen: 64, backup: true, validate: vOldOrNew(x => typeof x === 'string' && x.length <= 64) },
         'mengbao.settings':                  { type: 'object',   def: {} },
-        'mengbao.kantu.fab_pos':             { type: 'object',   def: {} },
-        'mengbao.kantu.fab_pos_fold':        { type: 'any',      def: null },
-        'mengbao.fanye.fab_pos':             { type: 'object',   def: {} },
-        'mengbao.fanye.fab_pos_fold':        { type: 'any',      def: null },
-        'mengbao.guolv.fab_pos_v2':          { type: 'object',   def: {} },
-        'mengbao.guolv.fab_pos_fold':        { type: 'any',      def: null },
-        'mengbao.zengqiang.fab_pos':         { type: 'object',   def: {} },
-        'mengbao.zengqiang.fab_pos_fold':    { type: 'any',      def: null }
+        'mengbao.kantu.fab_pos':             { type: 'object',   def: {}, backup: true },
+        'mengbao.kantu.fab_pos_fold':        { type: 'any',   def: null, backup: true },
+        'mengbao.fanye.fab_pos':             { type: 'object',   def: {}, backup: true },
+        'mengbao.fanye.fab_pos_fold':        { type: 'any',   def: null, backup: true },
+        'mengbao.guolv.fab_pos_v2':          { type: 'object',   def: {}, backup: true },
+        'mengbao.guolv.fab_pos_fold':        { type: 'any',   def: null, backup: true },
+        'mengbao.zengqiang.fab_pos':         { type: 'object',   def: {}, backup: true },
+        'mengbao.zengqiang.fab_pos_fold':    { type: 'any',   def: null, backup: true }
     };
 
     // 配置门面：校验 / 备份键 / 重置全部以 schema 为准，避免多处硬编码
@@ -192,24 +194,52 @@
             return s.validate ? !!s.validate(v) : true;
         },
         // 重置：GM_listValues 全量清扫 + schema 键兜底，返回真实删除条数
+        // 账号分桶键（USER_STORE_KEYS）在同一键内以 uid 为子键存多个账号，只能删当前桶，
+        // 整键删除会把所有账号的收藏/已读/头像/位置一起清空（历史问题）
         resetAll() {
             let n = 0;
             const seen = new Set();
+            let cur = 'guest';
+            try { cur = UserStore.curBucket(); } catch (e) { /* 极早期调用时按 guest 处理 */ }
+            const isUserKey = k => { try { return USER_STORE_KEYS.indexOf(k) !== -1; } catch (e) { return false; } };
+            // 注意：Util.storage 写进去的是 JSON 字符串（GM_setValue(key, JSON.stringify(val))），
+            // 所以这里必须先 JSON.parse 还原成对象，否则 typeof === 'object' 恒为 false，
+            // 会退化成整键删除、把其他账号的桶一起清掉
+            const wipe = k => {
+                if (seen.has(k)) return;
+                // 白名单是访问入口而非个人偏好：清掉后脚本在本站直接零动作，用户也没有面板去补，
+                // 与 UIDMAP_KEY 一样列入保留名单，重置后本站仍可继续使用
+                if (k === UIDMAP_KEY || k === 'mengbao.site.hosts') { seen.add(k); return; }
+                seen.add(k);
+                let val;
+                try {
+                    const raw = GM_getValue(k, null);
+                    if (raw === null || raw === undefined) return;
+                    val = (typeof raw === 'string') ? JSON.parse(raw) : raw;
+                } catch (e) { return; }  // 解析失败说明不是本脚本写入的结构，不碰
+                try {
+                    if (isUserKey(k) && val && typeof val === 'object' && !Array.isArray(val)) {
+                        if (!Object.prototype.hasOwnProperty.call(val, cur)) return;
+                        delete val[cur];
+                        // 与 Util.storage.set 保持同一写入格式（字符串化）
+                        if (Object.keys(val).length) { GM_setValue(k, JSON.stringify(val)); } else { GM_deleteValue(k); }
+                        n++;
+                        return;
+                    }
+                    GM_deleteValue(k); n++;
+                } catch (e) { /* 单个键读写异常不能中断整轮重置，否则连 toast 和刷新都执行不到 */ }
+            };
             try {
                 if (typeof GM_listValues === 'function') {
                     GM_listValues().forEach(k => {
-                        if (!k.startsWith('mengbao.') || seen.has(k)) return;
-                        seen.add(k);
-                        if (GM_getValue(k, null) !== null) { GM_deleteValue(k); n++; }
+                        if (!k.startsWith('mengbao.')) return;
+                        if (k === UIDMAP_KEY) { seen.add(k); return; }  // 域名→uid 历史映射全局共享，不随重置清除
+                        wipe(k);
                     });
                 }
             } catch (e) { /* 未授权时走 schema 兜底 */ }
-            Object.keys(CONFIG_SCHEMA).forEach(k => {
-                if (seen.has(k)) return;
-                try {
-                    if (GM_getValue(k, null) !== null) { GM_deleteValue(k); n++; }
-                } catch (e) { /* 单个键读写异常不能中断整轮重置，否则连 toast 和刷新都执行不到 */ }
-            });
+            Object.keys(CONFIG_SCHEMA).forEach(wipe);
+            try { USER_STORE_KEYS.forEach(wipe); } catch (e) { /* 兜底覆盖账号桶，防止 GM_listValues 不可用时漏掉 */ }
             return n;
         }
     };
@@ -350,7 +380,13 @@
                     headers: Object.assign({ 'Accept': 'text/html' }, extraHeaders || {}),
                     onload: (res) => {
                         if (res.status >= 200 && res.status < 300) resolve(res.responseText);
-                        else reject(new Error('HTTP ' + res.status));
+                        else {
+                            // 把状态码与响应头带到错误上：调用方才能读 Retry-After 决定等多久
+                            const err = new Error('HTTP ' + res.status);
+                            err.status = res.status;
+                            err.headers = res.responseHeaders || '';
+                            reject(err);
+                        }
                     },
                     onerror: () => reject(new Error('network')),
                     ontimeout: () => reject(new Error('timeout'))
@@ -370,7 +406,12 @@
                     headers, data,
                     onload: (res) => {
                         if (res.status >= 200 && res.status < 300) resolve(res.responseText);
-                        else reject(new Error('HTTP ' + res.status));
+                        else {
+                            const err = new Error('HTTP ' + res.status);
+                            err.status = res.status;
+                            err.headers = res.responseHeaders || '';
+                            reject(err);
+                        }
                     },
                     onerror: () => reject(new Error('network')),
                     ontimeout: () => reject(new Error('timeout'))
@@ -426,11 +467,58 @@
             }
         },
         parseHtml(html) { return new DOMParser().parseFromString(html, 'text/html'); },
+        // 论坛限流提示页识别：Discuz 限流返回的是 200 + 提示页，不是 4xx。
+        // 只扫提示区，并排除正文/引用，避免楼主正文里提到「请求过快」被误判
+        detectRateLimit(input) {
+            try {
+                const doc = typeof input === 'string' ? this.parseHtml(input) : input;
+                if (!doc) return null;
+                const nodes = Array.from(doc.querySelectorAll('#messagetext, [id^="messagetext_"], .alert_error, #ct .alert_info'))
+                    .filter(n => !n.closest('#postlist, .postmessage, blockquote, .quote, .t_f'));
+                if (!nodes.length) return null;
+                const plain = nodes.map(n => (n.textContent || '')).join(' ').replace(/\s+/g, ' ');
+                const m = plain.match(/间隔(?:少于|小于)?\s*(\d+)\s*秒/)
+                    || plain.match(/请\s*(\d+)\s*秒后再(?:试|操作|搜索)/)
+                    || plain.match(/(\d+)\s*秒内(?:只能|不能|仅能)/);
+                if (m) {
+                    const wait = Math.max(3, Math.min(120, parseInt(m[1], 10) || 0));
+                    return { waitSec: wait, msg: '需间隔 ' + wait + ' 秒' };
+                }
+                if (/过于?频繁|请求过快|访问过快|操作太快|秒后重新搜索|搜索间隔/.test(plain)) {
+                    return { waitSec: 30, msg: '论坛提示请求过快' };
+                }
+                return null;
+            } catch (e) { return null; }
+        },
         sleep(ms) { return new Promise(r => setTimeout(r, ms)); },
         extractImages(root) {
             if (!root) return [];
-            return this.extractImageNodes(root)
-                .map(el => el.getAttribute('zoomfile') || el.getAttribute('file') || el.getAttribute('src')).filter(Boolean);
+            const nodes = this.extractImageNodes(root);
+            // 服务端原始 HTML 里 zoomfile 常是相对路径（upian/forum/2026/11/x.jpg），由前端脚本在运行时补成绝对。
+            // 直接取 zoomfile 会拿到不带域名的地址，浏览器按本站域名解析后 404 —— 这是预览块"图永远不出来"的一类主因。
+            // 先收同帖出现过的绝对地址域名，供纯相对路径补全。
+            let origin = '';
+            nodes.forEach(el => {
+                if (origin) return;
+                ['zoomfile', 'file', 'src'].forEach(attr => {
+                    if (origin) return;
+                    const v = el.getAttribute(attr);
+                    if (v && /^https?:\/\//i.test(v)) origin = v.replace(/^(https?:\/\/[^/]+).*/i, '$1');
+                });
+            });
+            return nodes.map(el => {
+                const zf = el.getAttribute('zoomfile');
+                const f = el.getAttribute('file');
+                const s = el.getAttribute('src');
+                const abs = v => !!v && /^https?:\/\//i.test(v);
+                if (abs(zf)) return zf;
+                if (abs(f)) return f;
+                if (abs(s) && !/\/static\/image\/common\/none\.(gif|png)/i.test(s)) return s;
+                const raw = zf || f || s || '';
+                if (!raw) return '';
+                if (origin) return origin + '/' + raw.replace(/^\.?\//, '');
+                try { return new URL(raw, location.href).href; } catch (e) { return ''; }
+            }).filter(Boolean);
         },
         extractImageNodes(root) {
             if (!root) return [];
@@ -989,19 +1077,23 @@
         .mb-gallery-slow { position:absolute; left:50%; bottom:14px; transform:translateX(-50%); display:none; font-size:var(--mb-font-sm); color:var(--mb-text-muted); background:rgba(255,255,255,0.88); padding:3px 10px; border-radius:var(--mb-radius-sm); white-space:nowrap; z-index:2; }
         .mb-gallery-fallback { color:var(--mb-text-hint);font-size:var(--mb-font-sm);text-align:center;padding:0 12px;line-height:1.6; }
         .mb-gallery-cell.is-error { background:var(--mb-bg-secondary); box-shadow:var(--mb-shadow-xs); }
-        .mb-gallery-loading { width:var(--mb-size-icon-md); height:var(--mb-size-icon-md); border:3px solid rgba(255,255,255,0.3); border-top-color:var(--mb-accent); border-radius:50%;animation:mb-spin 0.8s linear infinite; position:relative; z-index:1; }
+        .mb-gallery-loading { width:36px; height:14px; display:flex; align-items:center; justify-content:center; gap:5px; position:relative; z-index:1; }
+        .mb-gallery-loading i { width:7px; height:7px; border-radius:50%; background:var(--mb-accent); display:block; animation:mb-dot 1.1s ease-in-out infinite; }
+        .mb-gallery-loading i:nth-child(2) { animation-delay:.18s; }
+        .mb-gallery-loading i:nth-child(3) { animation-delay:.36s; }
+        @keyframes mb-dot { 0%,100% { opacity:.25; transform:scale(.7); } 50% { opacity:1; transform:scale(1); } }
         .mb-gallery-go { position:absolute;bottom:6px;right:6px;background:rgba(255,255,255,0.85);color:var(--mb-accent-deep);font-size:var(--mb-font-sm);padding:4px 8px;border-radius:var(--mb-radius);cursor:pointer;opacity:0.85;z-index:2;display:flex;align-items:center;gap:4px;user-select:none;outline:none;backdrop-filter:blur(4px);transition:opacity var(--mb-t-fast); }
         .mb-gallery-cell:hover .mb-gallery-go { opacity:1; }
         .mb-gallery-go:hover { background:var(--mb-bg-page); }
         /* 大图上限为内容区 100%，超大图等比缩到视口内完整可见；
            早前 max:none 会让 1536×2048 这类原图按 1:1 溢出视口、四周被裁 */
-        .mb-single-view { position:fixed;inset:0;background:rgba(0,0,0,0.82);display:none;align-items:center;justify-content:center;z-index:var(--mb-z-single);box-sizing:border-box;padding:76px 24px 104px; }
+        .mb-single-view { position:fixed;inset:0;background:rgba(0,0,0,0.94);display:none;align-items:center;justify-content:center;z-index:var(--mb-z-single);box-sizing:border-box;padding:76px 24px 104px; }
         .mb-single-bar { position:absolute;top:0;left:0;right:0;height:52px;display:flex;align-items:center;gap:8px;padding:0 20px;box-sizing:border-box;background:linear-gradient(180deg,rgba(0,0,0,0.82) 0%,rgba(0,0,0,0.58) 58%,rgba(0,0,0,0) 100%);box-shadow:inset 0 -1px 0 rgba(255,255,255,0.08);z-index:12;cursor:pointer;transition:background var(--mb-t-base) ease; }
         .mb-single-bar:hover { background:linear-gradient(180deg,rgba(0,0,0,0.88) 0%,rgba(0,0,0,0.66) 58%,rgba(0,0,0,0) 100%); }
         .mb-single-view img { max-width:100%;max-height:100%;width:auto;height:auto;flex:none;object-fit:contain;z-index:1;cursor:default;transition:transform var(--mb-t-base) ease;user-select:none;-webkit-user-drag:none; }
-        .mb-single-loading { position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); color:var(--mb-text-on-accent); z-index:2; }
-        .mb-single-loading::before { content:''; display:inline-block; width:40px; height:40px; border:3px solid var(--mb-text-on-accent); border-top-color:transparent; border-radius:50%; animation:mb-spin 0.8s linear infinite; margin-right:12px; vertical-align:middle; }
-        .mb-single-slow { display:none; margin-left:12px; vertical-align:middle; font-size:var(--mb-font-md); white-space:nowrap; }
+        .mb-single-loading { position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); color:var(--mb-text-on-accent); z-index:2; text-align:center; }
+        .mb-single-loading .mb-gallery-loading { display:flex; width:30px; height:12px; gap:4px; justify-content:flex-start; margin:0 auto; }
+        .mb-single-slow { display:none; font-size:var(--mb-font-md); white-space:nowrap; margin-top:10px; }
         .mb-single-fail { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); color:var(--mb-text-on-accent); font-size:var(--mb-font-md); z-index:2; display:none; }
         .mb-single-thumbs { position:absolute; bottom:10px; left:50%; transform:translateX(-50%); display:flex; gap:6px; z-index:2; max-width:70%; overflow-x:auto; padding:6px 10px 16px; background:rgba(0,0,0,0.4); border-radius:var(--mb-radius-sm); scrollbar-width:none; }
         .mb-single-thumbs::-webkit-scrollbar { display:none; }
@@ -1009,6 +1101,8 @@
         .mb-single-thumb:hover { opacity:0.8; transform:scale(1.1); }
         .mb-single-thumb.active { opacity:1; border:3px solid var(--mb-amber); transform:scale(1.15); box-shadow:0 0 0 2px var(--mb-amber-glow); }
         .mb-single-thumb img { width:100%; height:100%; object-fit:cover; }
+        .mb-single-thumb.is-error { background:rgba(255,255,255,0.07); }
+        .mb-single-thumb.is-error::after { content:''; position:absolute; left:50%; top:50%; width:16px; height:16px; margin:-8px 0 0 -8px; opacity:.5; background:linear-gradient(45deg,transparent 46%,rgba(255,255,255,0.85) 46%,rgba(255,255,255,0.85) 54%,transparent 54%),linear-gradient(-45deg,transparent 46%,rgba(255,255,255,0.85) 46%,rgba(255,255,255,0.85) 54%,transparent 54%); }
         .mb-single-counter { background:none;padding:0;color:rgba(255,255,255,0.92);font-size:13px;font-weight:500;letter-spacing:0.3px;text-shadow:0 1px 2px rgba(0,0,0,0.65);user-select:none;white-space:nowrap;margin-right:auto;pointer-events:none; }
         .mb-single-btn { width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.28);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:background var(--mb-t-base) ease,border-color var(--mb-t-base) ease; }
         .mb-single-btn:hover { background:rgba(255,255,255,0.22); border-color:rgba(255,255,255,0.55); }
@@ -1109,7 +1203,8 @@
         }
         /* 减弱动效偏好：仅画廊内 loading 尊重系统设置；悬浮球 loading 旋转为保证状态可区分，始终生效 */
         @media (prefers-reduced-motion: reduce) {
-            .mb-gallery-loading { animation:none !important; }
+            .mb-gallery-loading i { animation:none !important; opacity:.6; }
+            .mb-kantu-thumb { transition:none !important; }
         }
         /* 头像设置弹窗 */
         .mb-avatar-head { display:block; margin-bottom:0; }
@@ -1165,8 +1260,9 @@
         .mb-flash-ring { transition:box-shadow .3s; box-shadow:0 0 0 3px var(--mb-amber), 0 0 0 5px var(--mb-amber-glow) !important; }
         .mb-kantu-scroll-inner { display:flex; align-items:center; gap:6px; overflow-x:auto; scrollbar-width:none; }
         .mb-kantu-scroll-inner::-webkit-scrollbar { display:none; }
+        .mb-kantu-invalid-tip { width:100%; box-sizing:border-box; margin:6px 0; padding:4px 12px; border:1px dashed var(--mb-border); border-radius:var(--mb-radius-sm); background:transparent; color:var(--mb-text-hint); font-size:var(--mb-font-sm); line-height:1.4; flex-shrink:0; }
         .mb-kantu-empty-wrap { width:100%; box-sizing:border-box; margin:6px 0; padding:4px 12px; border:1px dashed var(--mb-border); border-radius:var(--mb-radius-sm); background:transparent; color:var(--mb-text-hint); font-size:var(--mb-font-sm); line-height:1.4; }
-        .mb-kantu-thumb { cursor:pointer; display:block; background:#eef1f4; border-radius:var(--mb-radius); object-fit:cover; flex-shrink:0; height:200px; max-width:340px; }
+        .mb-kantu-thumb { cursor:pointer; display:block; background:#f5f7f9; box-shadow:inset 0 0 0 1px rgba(17,24,39,0.12); border-radius:var(--mb-radius); object-fit:cover; flex-shrink:0; height:200px; max-width:340px; }
         /* 搜索过滤面板收拢 */
         .mb-guolv-head { display:flex; flex-direction:row; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
         .mb-guolv-title { font-size:var(--mb-font-title); font-weight:600; color:var(--mb-text-primary); }
@@ -1307,16 +1403,20 @@
     };
 
     // ===================== FAB 工厂 =====================
+    // 同页全部悬浮球实例，供竖线吸附互查
+    const MB_FABS = [];
     function createFab(options) {
         const fab = {
             el: null, panel: null, folded: true,
             storageKey: options.storageKey,
+            snapSource: !!options.snapSource,
+            snapTarget: !!options.snapTarget,
             dragState: { offsetX: 0, offsetY: 0, moved: false },
             init() {
                 if (options.panelClass) {
                     const cls = '.' + options.panelClass.replace(/ /g, '.');
                     const oldPanel = document.querySelector(cls);
-                    if (oldPanel && oldPanel.closest('.mb-fab')) { this.el = oldPanel.closest('.mb-fab'); this.panel = oldPanel; return; }
+                    if (oldPanel && oldPanel.closest('.mb-fab')) { this.el = oldPanel.closest('.mb-fab'); this.panel = oldPanel; if (MB_FABS.indexOf(this) < 0) MB_FABS.push(this); return; }
                 }
                 this.el = document.createElement('div');
                 this.el.className = 'mb-fab';
@@ -1363,6 +1463,7 @@
                 if (!savedFold) panel.classList.add('mb-fab-panel--open');
 
                 document.body.appendChild(this.el);
+                if (MB_FABS.indexOf(this) < 0) MB_FABS.push(this);
                 if (options.panelBuilder) options.panelBuilder(panel);
 
                 btn.addEventListener('click', () => {
@@ -1401,6 +1502,24 @@
                         document.removeEventListener('mousemove', onMove);
                         document.removeEventListener('mouseup', onUp);
                         if (this.dragState.moved) {
+                            const left = parseInt(this.el.style.left, 10);
+                            const top = parseInt(this.el.style.top, 10);
+                            // 竖线吸附：只在松手时判断，只对齐 left，不动 top
+                            // 看图/翻页可主动吸（snapSource），过滤只当靶（snapTarget），增强两者都不参与
+                            if (this.snapSource && Number.isFinite(left) && Number.isFinite(top)) {
+                                const h = this.el.offsetHeight || CONST.FAB_SIZE;
+                                let target = null, best = CONST.SNAP_THRESHOLD;
+                                MB_FABS.forEach(f => {
+                                    if (f === this || !f.snapTarget || !f.el || !f.el.parentNode) return;
+                                    const fl = parseInt(f.el.style.left, 10);
+                                    const ft = parseInt(f.el.style.top, 10);
+                                    if (!Number.isFinite(fl) || !Number.isFinite(ft)) return;
+                                    if (Math.abs(ft - top) < h + 4) return;   // 防重叠：纵向太近不吸
+                                    const d = Math.abs(fl - left);
+                                    if (d <= best) { best = d; target = fl; }
+                                });
+                                if (target !== null) this.el.style.left = target + 'px';
+                            }
                             Util.userStore.set(options.storageKey, {
                                 left: parseInt(this.el.style.left, 10),
                                 top: parseInt(this.el.style.top, 10)
@@ -1658,13 +1777,29 @@
         document.body.appendChild(mask);
         box.querySelector('.mb-host-cancel').onclick = () => mask.remove();
         box.querySelector('.mb-host-save').onclick = () => {
-            const arr = box.querySelector('.mb-host-text').value.split(/[\n\r]+/).map(x => x.trim().toLowerCase())
+            // rawList 是去掉空行后的原始输入行，用来区分「真的清空」和「填了一堆但一条都不合法」
+            const rawList = box.querySelector('.mb-host-text').value.split(/[\n\r]+/).map(x => x.trim()).filter(Boolean);
+            const arr = rawList.map(x => x.toLowerCase())
                 .map(x => x.replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/^\.+|\.+$/g, ''))
                 .filter(x => x && /^[a-z0-9.-]+\.[a-z]{2,}$/.test(x));
-            if (arr.length) Util.storage.set('mengbao.site.hosts', arr);
-            else Util.storage.remove('mengbao.site.hosts');
+            if (!rawList.length) {
+                // 真的留空：按原设计恢复内置默认域名
+                Util.storage.remove('mengbao.site.hosts');
+                mask.remove();
+                mbToast('输入为空，已恢复内置默认域名，刷新后生效', 2400, 'success');
+                return;
+            }
+            if (!arr.length) {
+                // 有内容但一条都不合法：拒绝保存，不动原值，面板留着让用户改
+                mbToast('没有识别到有效域名，白名单未改动', 2600, 'error');
+                return;
+            }
+            Util.storage.set('mengbao.site.hosts', arr);
+            const ignored = rawList.length - arr.length;
             mask.remove();
-            mbToast('白名单已保存，刷新后生效（其它已打开的页面也要刷新）', 2400, 'success');
+            mbToast(ignored > 0
+                ? `已保存 ${arr.length} 个域名，忽略 ${ignored} 行无效内容，刷新后生效`
+                : '白名单已保存，刷新后生效（其它已打开的页面也要刷新）', 2600, 'success');
         };
     }
 
@@ -1684,8 +1819,30 @@
             } catch (e) {}
             return null;
         };
+        // 熔断：与其它脚本（如九八堂官方脚本）抢同一组排序参数时，双方每次加载都互相纠正，
+        // 形成"页面不停自己刷新、点不进去"的死循环。
+        // 判据只看「从哪儿来」：referrer 是带 orderby 的列表页，说明本页刚被跳到目标态又被弹回来，
+        // 这是死锁的直接特征，此时让路并提示。
+        // 其余来源——详情页返回、版块页、首页、直接输入地址、书签——referrer 都不是那个形态，
+        // 一律照常跳。只用本脚本的用户不会撞上计数或时间窗，只有真的被弹回才让路。
+        const bouncedBack = (() => {
+            try {
+                const ref = document.referrer || '';
+                if (!ref) return false;
+                const u = new URL(ref);
+                return u.searchParams.get('mod') === 'forumdisplay'
+                    && u.searchParams.get('orderby') === CONST.SORT_ORDERBY;
+            } catch (e) { return false; }
+        })();
         const initUrl = getFixedUrl(location.href);
-        if (initUrl && initUrl !== location.href) { location.replace(initUrl); return; }
+        if (initUrl && initUrl !== location.href) {
+            if (bouncedBack) {
+                mbToast('检测到排序参数被其它脚本反复改写，已停用本次自动排序（可手动点「时间排序」）', 3600, 'info');
+                return;
+            }
+            location.replace(initUrl);
+            return;
+        }
         document.addEventListener('click', (e) => {
             const link = e.target.closest('a');
             if (!link || !link.href) return;
@@ -1756,7 +1913,7 @@
             <div class="mb-single-view">
                 <div class="mb-single-bar"><div class="mb-single-counter"></div></div>
                 <img>
-                <div class="mb-single-loading"><span class="mb-single-slow">原图较大，正在加载…</span></div>
+                <div class="mb-single-loading"><span class="mb-gallery-loading"><i></i><i></i><i></i></span><span class="mb-single-slow">原图较大，正在加载…</span></div>
                 <div class="mb-single-fail">图片加载失败</div>
             </div>`;
             // 标题清洗：取第一个 " - " 之前部分；使用 textContent，避免注入
@@ -1792,35 +1949,52 @@
                 const loading = mask.querySelector('.mb-single-loading');
                 const failEl = mask.querySelector('.mb-single-fail');
                 const slowEl = mask.querySelector('.mb-single-slow');
-                loading.style.display = 'block';
+                // 默认不显示转圈：帖子预览与画廊用的是同一批 URL，点进来时基本都已缓存，
+                // 无条件亮转圈会白闪一下
+                loading.style.display = 'none';
                 if (failEl) failEl.style.display = 'none';
                 if (slowEl) slowEl.style.display = 'none';
                 bigImg.style.display = 'none';
-                // 慢加载提示：超过 3 秒才补一行字，快速加载时不打扰
-                //         连续切图会重入，先清上一个定时器，否则旧图残留的定时器会提前替新图亮字
+                // 连续切图会重入，先清上一个定时器，否则旧图残留的定时器会提前替新图亮字
+                //         慢加载文案只在确认需要等待时才起计时，已缓存的图不设这个 3 秒定时器
                 if (singleSlowTimer) { clearTimeout(singleSlowTimer); singleSlowTimer = null; }
-                singleSlowTimer = setTimeout(() => {
-                    singleSlowTimer = null;
-                    if (slowEl && loading.style.display === 'block') slowEl.style.display = 'inline-block';
-                }, 3000);
                 const clearSlow = () => { if (singleSlowTimer) { clearTimeout(singleSlowTimer); singleSlowTimer = null; } if (slowEl) slowEl.style.display = 'none'; };
                 // 用一个临时的加载状态，等新图片加载完成后再显示
                 const newImg = new Image();
-                newImg.onload = () => {
+                const curUrl = imgArr[currentIdx];
+                // 缓存命中的图设完 src 就立刻 complete，同步收掉转圈，用户看不到任何加载动画；
+                // settled 标记防止 onload 与同步分支对同一张图重复执行
+                let settled = false;
+                const showLoaded = () => {
+                    if (settled) return;
+                    settled = true;
                     clearSlow();
-                    bigImg.src = imgArr[currentIdx];
+                    bigImg.src = curUrl;
                     bigImg.style.display = 'block';
                     loading.style.display = 'none';
                     if (failEl) failEl.style.display = 'none';
                     resetView();
                 };
+                newImg.onload = showLoaded;
                 newImg.onerror = () => {
+                    if (settled) return;
+                    settled = true;
                     clearSlow();
                     bigImg.style.display = 'none';
                     loading.style.display = 'none';
                     if (failEl) failEl.style.display = 'block';
                 };
-                newImg.src = imgArr[currentIdx];
+                newImg.src = curUrl;
+                if (newImg.complete && newImg.naturalWidth > 0) {
+                    showLoaded();          // 已缓存：同一帧内直接呈现，不露转圈
+                } else {
+                    loading.style.display = 'block';
+                    if (singleSlowTimer) { clearTimeout(singleSlowTimer); singleSlowTimer = null; }
+                    singleSlowTimer = setTimeout(() => {
+                        singleSlowTimer = null;
+                        if (slowEl && loading.style.display === 'block') slowEl.style.display = 'inline-block';
+                    }, 3000);
+                }
                 if (currentIdx < mainCount) {
                     counter.textContent = (currentIdx + 1) + ' / ' + mainCount;
                 } else {
@@ -1856,6 +2030,8 @@
                 // 300 图的大帖若一次性全赋 src 会瞬间打满连接，交给浏览器按视口懒加载
                 thumbImg.loading = 'lazy';
                 thumbImg.decoding = 'async';
+                // 图挂掉时不要留浏览器原生破图：藏起 img，外层换成统一的深底细叉占位
+                thumbImg.onerror = () => { thumbImg.style.display = 'none'; thumb.classList.add('is-error'); };
                 thumbImg.src = url;
                 thumb.appendChild(thumbImg);
                 thumb.onclick = (e) => { e.stopPropagation(); showSingle(idx); };
@@ -1956,9 +2132,26 @@
                         }
                     }
                     const cell = document.createElement('div');
-                    cell.className = 'mb-gallery-cell is-loading';
+                    // 不预先挂 loading：视口外的格子根本不会发请求，一开画廊整片转圈是假象
+                    cell.className = 'mb-gallery-cell';
                     const loading = document.createElement('div');
                     loading.className = 'mb-gallery-loading';
+                    loading.innerHTML = '<i></i><i></i><i></i>';
+                    // 慢加载提示元素：随格子一起创建，但计时由 startSpin 启动（视口外不发请求就不该提示）
+                    const slowEl = document.createElement('div');
+                    slowEl.className = 'mb-gallery-slow';
+                    slowEl.textContent = '原图较大，正在加载…';
+                    let slowTimer = null;
+                    // 真正发起请求时才挂 spinner，并同时起算 3 秒慢加载提示
+                    const startSpin = () => {
+                        if (loading.parentNode) return;
+                        cell.classList.add('is-loading');
+                        cell.appendChild(loading);
+                        if (!slowTimer) {
+                            slowTimer = setTimeout(() => { if (slowEl.parentNode) slowEl.style.display = 'block'; }, 3000);
+                            cell._mbSlowTimer = slowTimer;
+                        }
+                    };
                     const gImg = document.createElement('img');
                     gImg.alt = '';
                     const goBtn = document.createElement('span');
@@ -1976,33 +2169,34 @@
                             }, 250);
                         }
                     };
-                    // 慢加载提示：超过 3 秒才显示一行字
-                    const slowEl = document.createElement('div');
-                    slowEl.className = 'mb-gallery-slow';
-                    slowEl.textContent = '原图较大，正在加载…';
-                    const slowTimer = setTimeout(() => { if (slowEl.parentNode) slowEl.style.display = 'block'; }, 3000);
-                    cell._mbSlowTimer = slowTimer;
-                    gImg.onload = () => {
+
+                    // 缓存命中时同帧直达，不必再等一次 onload 异步回调（与单图浏览同一套判法）
+                    let settled = false;
+                    const settle = () => {
+                        if (settled) return;
+                        settled = true;
                         clearTimeout(slowTimer);
                         cell.classList.remove('is-loading');
-                        loading.remove();
-                        slowEl.remove();
+                        if (loading.parentNode) loading.remove();
+                        if (slowEl.parentNode) slowEl.remove();
                         gImg.style.display = 'block';
                         if (imgRefs && imgRefs[idx]) cell.appendChild(goBtn);
                     };
+                    gImg.onload = settle;
                     gImg.onerror = () => {
+                        if (settled) return;
+                        settled = true;
                         clearTimeout(slowTimer);
                         cell.classList.remove('is-loading');
                         cell.classList.add('is-error'); // 标记为加载失败
-                        loading.remove();
-                        slowEl.remove();
+                        if (loading.parentNode) loading.remove();
+                        if (slowEl.parentNode) slowEl.remove();
                         gImg.remove();
                         const fallback = document.createElement('div');
                         fallback.className = 'mb-gallery-fallback';
                         fallback.textContent = '图片加载失败';
                         cell.appendChild(fallback);
                     };
-                    cell.appendChild(loading);
                     cell.appendChild(gImg);
                     cell.appendChild(slowEl);
                     cell.onclick = (e) => { 
@@ -2012,11 +2206,19 @@
                         showSingle(idx); 
                     };
                     fragment.appendChild(cell);
-                    cellObjs.push({ cell, gImg, url });
+                    cellObjs.push({ cell, gImg, url, settle, startSpin });
                 });
                 grid.appendChild(fragment);
                 // 用 requestIdleCallback 低优先级串行预加载剩余全部图，滚到即看
-                const loadOne = (obj) => { if (obj && !obj.gImg.src) obj.gImg.src = obj.url; };
+                const loadOne = (obj) => {
+                    if (!obj || obj.gImg.src) return;
+                    if (obj.startSpin) obj.startSpin();
+                    obj.gImg.src = obj.url;
+                    // 已缓存的图设完 src 就能同步拿到尺寸，直接同帧收掉加载态
+                    const trySettle = () => { if (obj.gImg.complete && obj.gImg.naturalWidth > 0) obj.settle(); };
+                    trySettle();
+                    if (!obj.gImg.complete) requestAnimationFrame(trySettle);
+                };
                 if ('IntersectionObserver' in window) {
                     const lazyObserver = new IntersectionObserver((entries) => {
                         entries.forEach(entry => {
@@ -2044,7 +2246,9 @@
                 ric(pump);
             }, 16);
             mask.onclick = (e) => { if (e.target === mask) closeGallery(); };
-            single.onwheel = (e) => {
+            // 滚轮翻图 / Ctrl+滚轮缩放都必须 preventDefault，只能是非 passive；
+            // 显式声明 { passive: false } 让 Chrome 不再发 "non-passive wheel listener" 告警
+            single.addEventListener('wheel', (e) => {
                 e.preventDefault();
                 if (e.ctrlKey) {
                     scale += e.deltaY > 0 ? -0.1 : 0.1;
@@ -2055,7 +2259,7 @@
                 } else {
                     showSingle(currentIdx + (e.deltaY > 0 ? 1 : -1));
                 }
-            };
+            }, { passive: false });
             //          点背景与按 Esc 共用同一份，保证两种退出方式落到同一层
             function backToGrid() {
                 galleryBox.style.display = 'flex';
@@ -2231,6 +2435,7 @@
             Lazy.ensureImgObserver();
             this.fab = createFab({
                 module: 'kantu', storageKey: 'mengbao.kantu.fab_pos',
+                snapSource: true, snapTarget: true,
                 defaultPos: { left: 24, bottom: 280 },
                 onClick: (fab) => this.handleFabClick(fab),
                 onContextMenu: (fab) => this.handleFabRightClick(fab)
@@ -2252,6 +2457,16 @@
             });
             const order = Array.isArray(stored.order) ? stored.order.filter(x => typeof x === 'string' && data[x]) : Object.keys(data);
             this._cacheStore = { data, order };
+        },
+        // 丢掉单帖的预览缓存（持久层 + 内存层），供「原帖图片加载失败」的 [重试] 使用
+        _dropCache(tid) {
+            const store = this._cacheStore;
+            if (store.data[tid]) {
+                delete store.data[tid];
+                store.order = store.order.filter(x => x !== tid);
+                this._cacheDirty = true;
+            }
+            this.loadedPostCache.delete(tid);
         },
         _persistCache(tid, title, imgs) {
             if (!imgs || imgs.length === 0) return;
@@ -2407,14 +2622,26 @@
         renderCachedPreview(anchor, tid, postTitle, imgs) {
             const old = document.getElementById(CONST.PREVIEW_ID_PREFIX + tid);
             if (old) old.remove();
+            const mount = (w) => { if (anchor.tagName === 'LI') anchor.appendChild(w); else anchor.after(w); };
+            // 重试只重发图片请求，不重抓帖子 HTML：HTML 内容不会变，重抓还会触发站点限流
+            const retry = () => {
+                this._dropCache(tid);
+                const prev = document.getElementById(CONST.PREVIEW_ID_PREFIX + tid);
+                if (prev) prev.remove();
+                const built = this._buildPreviewWrap(anchor, tid);
+                this.loadImagesInto(null, built.tdWrap, postTitle, imgs, retry);
+                mount(built.wrap);
+                this._syncRowHidden(anchor, built.wrap, tid);
+                this._memCacheSet(tid, { title: postTitle, imgs, dom: built.wrap });
+            };
             const { wrap, tdWrap } = this._buildPreviewWrap(anchor, tid);
-            this.loadImagesInto(null, tdWrap, postTitle, imgs);
-            if (anchor.tagName === 'LI') anchor.appendChild(wrap); else anchor.after(wrap);
+            this.loadImagesInto(null, tdWrap, postTitle, imgs, retry);
+            mount(wrap);
             this._syncRowHidden(anchor, wrap, tid);
             this._memCacheSet(tid, { title: postTitle, imgs, dom: wrap });
         },
         //      处理完统一释放 processingTids，单任务异常隔离
-        _requestPreview(url, tid, onOk, onFail) {
+        _requestPreview(url, tid, onOk, onFail, rank) {
             this.processingTids.add(tid);
             const task = () => Util.httpGet(url).then(
                 (html) => {
@@ -2442,13 +2669,18 @@
                 }
             );
             task.__tid = tid; task.__epoch = this._epoch;
+            // rank 越小越先出队：0 = 用户主动（点预览、点重试），3 = 持续加载的批量预取
+            task.__rank = Number.isFinite(rank) ? rank : 0;
+            Util.log('debug', '[队列] 入队 tid=' + tid + ' rank=' + task.__rank + ' 待办=' + (this.requestQueue.length + 1));
             this.enqueueRequest(task);
         },
-        loadThreadPreview(tbody, tid, postTitle) {
+        loadThreadPreview(tbody, tid, postTitle, rank) {
             if (this.loadedPostCache.has(tid) || this.processingTids.has(tid)) return;
             const linkA = tbody.querySelector('.icn > a');
             if (!linkA) return;
             const url = new URL(linkA.href, location.origin).href;
+            // 持续加载的批量扫描排 3，用户滚到/点重试的排 0
+            const taskRank = Number.isFinite(rank) ? rank : (this._continuous ? 3 : 0);
             this._requestPreview(url, tid,
                 (postEl) => {
                     if (this._stopped) return;
@@ -2456,7 +2688,18 @@
                     const old = document.getElementById(infoId); if (old) old.remove();
                     const { wrap, tdWrap } = this._buildPreviewWrap(tbody, tid);
                     const imgs = Util.extractImages(postEl);
-                    this.loadImagesInto(postEl, tdWrap, postTitle, imgs);
+                    // 重试只重发图片请求，不重抓帖子 HTML（内容不会变，重抓会触发限流并串成「帖子加载失败」）
+                    const retry = () => {
+                        this._dropCache(tid);
+                        const prev = document.getElementById(infoId);
+                        if (prev) prev.remove();
+                        const built = this._buildPreviewWrap(tbody, tid);
+                        this.loadImagesInto(null, built.tdWrap, postTitle, imgs, retry);
+                        tbody.after(built.wrap);
+                        this._syncRowHidden(tbody, built.wrap, tid);
+                        this._memCacheSet(tid, { title: postTitle, imgs, dom: built.wrap });
+                    };
+                    this.loadImagesInto(postEl, tdWrap, postTitle, imgs, retry);
                     this._persistCache(tid, postTitle, imgs);
                     this._memCacheSet(tid, { title: postTitle, imgs, dom: wrap });
                     tbody.after(wrap);
@@ -2477,20 +2720,22 @@
                         e.stopPropagation();
                         wrap.remove();
                         this._failedTids.delete(tid);
-                        this.loadThreadPreview(tbody, tid, postTitle);
+                        // 用户点重试：排到 0，插到持续加载的批量任务前面
+                        this.loadThreadPreview(tbody, tid, postTitle, 0);
                     };
                     tdWrap.appendChild(retryBtn);
                     wrap.dataset.mbFailed = '1';
                     this._failedTids.add(tid);
                     tbody.after(wrap);
                     this._syncRowHidden(tbody, wrap, tid);
-                });
+                }, taskRank);
         },
-        genericLoadPreview(linkEl, tid, postTitle) {
+        genericLoadPreview(linkEl, tid, postTitle, rank) {
             if (this.loadedPostCache.has(tid) || this.processingTids.has(tid)) return;
             const url = new URL(linkEl.href, location.origin).href;
             let anchor = linkEl.closest('li, dl, div.item, div.threadlist, div.thread, tr');
             if (!anchor) anchor = linkEl.parentElement;
+            const taskRank = Number.isFinite(rank) ? rank : (this._continuous ? 3 : 0);
             this._requestPreview(url, tid,
                 (postEl) => {
                     if (this._stopped) return;
@@ -2498,10 +2743,22 @@
                     const old = document.getElementById(infoId); if (old) old.remove();
                     const { wrap, tdWrap } = this._buildPreviewWrap(anchor, tid);
                     const imgs = Util.extractImages(postEl);
-                    this.loadImagesInto(postEl, tdWrap, postTitle, imgs);
+                    const mount = (w) => { if (anchor.tagName === 'LI') anchor.appendChild(w); else anchor.after(w); };
+                    // 重试只重发图片请求，不重抓帖子 HTML（内容不会变，重抓会触发限流并串成「帖子加载失败」）
+                    const retry = () => {
+                        this._dropCache(tid);
+                        const prev = document.getElementById(infoId);
+                        if (prev) prev.remove();
+                        const built = this._buildPreviewWrap(anchor, tid);
+                        this.loadImagesInto(null, built.tdWrap, postTitle, imgs, retry);
+                        mount(built.wrap);
+                        this._syncRowHidden(anchor, built.wrap, tid);
+                        this._memCacheSet(tid, { title: postTitle, imgs, dom: built.wrap });
+                    };
+                    this.loadImagesInto(postEl, tdWrap, postTitle, imgs, retry);
                     this._persistCache(tid, postTitle, imgs);
                     this._memCacheSet(tid, { title: postTitle, imgs, dom: wrap });
-                    if (anchor.tagName === 'LI') anchor.appendChild(wrap); else anchor.after(wrap);
+                    mount(wrap);
                     this._syncRowHidden(anchor, wrap, tid);
                 },
                 (reason) => {
@@ -2519,16 +2776,16 @@
                         e.stopPropagation();
                         wrap.remove();
                         this._failedTids.delete(tid);
-                        this.genericLoadPreview(anchor, tid, postTitle);
+                        this.genericLoadPreview(anchor, tid, postTitle, 0);
                     };
                     tdWrap.appendChild(retryBtn);
                     wrap.dataset.mbFailed = '1';
                     this._failedTids.add(tid);
                     if (anchor.tagName === 'LI') anchor.appendChild(wrap); else anchor.after(wrap);
                     this._syncRowHidden(anchor, wrap, tid);
-                });
+                }, taskRank);
         },
-        loadImagesInto(doc, container, postTitle, presetImgs) {
+        loadImagesInto(doc, container, postTitle, presetImgs, onRetry) {
             const fullSrcList = presetImgs || (doc ? Util.extractImages(doc) : []);
             const wrap = document.createElement('div');
             wrap.className = 'mb-kantu-scroll-wrap';
@@ -2548,19 +2805,95 @@
                 container.appendChild(wrap);
                 return;
             }
+            let okCount = 0, failCount = 0, autoRetried = false, stripExpanded = false;
+            // 占位从 96px 起（约半高），第一张图真的加载成功后才整条展开到 thumbH。
+            // 展开为瞬变、无过渡：44→200 差 156px，带过渡会显得"慢慢长出来"。
+            // 全挂帖全程只有 96px 高，不会出现"先撑满 200px 再塌成一行"的观感；
+            // 能加载的帖则是图到了才长高，跳变方向有内容支撑。
+            const expandStrip = () => {
+                if (stripExpanded) return;
+                stripExpanded = true;
+                inner.querySelectorAll('.mb-kantu-thumb').forEach(t => { t.style.height = thumbH + 'px'; });
+                const moreEl = inner.querySelector('.mb-kantu-more');
+                if (moreEl) moreEl.style.height = thumbH + 'px';
+            };
             initialList.forEach((picUrl, idx) => {
                 const img = document.createElement('img');
                 img.className = 'mb-kantu-thumb';
                 img.style.width = 'auto';
                 img.style.objectFit = 'cover';
                 img.style.minWidth = '120px';
-                img.style.height = thumbH + 'px';
+                img.style.height = CONST.KANTU_START_H + 'px';
+                // 图一露头（浏览器已解码出真实尺寸）就撑开，不必等整张下完。
+                // 前 3 秒密集探测，之后降频到 500ms 继续探，直到 onload / onerror；
+                // 窗口取 180 秒：慢图床下 naturalWidth 可能 30 秒后才出现，窗口太短会停在起点高度。
+                // 挂图帖的 naturalWidth 恒为 0，轮询永不命中，仍走起点高度 → 一行虚线，不会先撑 200 再塌。
+                let probeTimer = null;
+                const probeStart = Date.now();
+                const stopProbe = () => { if (probeTimer) { clearTimeout(probeTimer); probeTimer = null; } };
+                const probeTick = () => {
+                    probeTimer = null;
+                    if (stripExpanded) return;              // 已有图撑开整条，无需再探
+                    if (img.naturalWidth > 0) { expandStrip(); return; }
+                    const elapsed = Date.now() - probeStart;
+                    if (elapsed >= 180000) return;         // 硬保险：慢图晚解码时仍有机会撑开，180 秒覆盖慢图床
+                    probeTimer = setTimeout(probeTick, elapsed < 3000 ? 60 : 500);
+                };
+                probeTimer = setTimeout(probeTick, 60);
+                // 单张失败直接抽掉，不留占位块；整帖全挂时才给一行说明，避免一排灰块看着像整页故障
+                img.onload = () => { stopProbe(); okCount++; expandStrip(); };
                 img.onerror = () => {
-                    img.style.display = 'none';
-                    const placeholder = document.createElement('div');
-                    placeholder.style.cssText = 'height:' + thumbH + 'px; width:120px; background:var(--mb-bg-secondary); border-radius:var(--mb-radius-sm); display:flex; align-items:center; justify-content:center; color:var(--mb-text-hint); font-size:var(--mb-font-sm); flex-shrink:0;';
-                    placeholder.textContent = '加载失败';
-                    img.parentNode.insertBefore(placeholder, img);
+                    stopProbe();
+                    failCount++;
+                    img.style.visibility = 'hidden';   // 先藏起来，等整帖的图都有结果再统一处理
+                    // 还有图没出结果就等。不能现在删：立刻删会让"整帖全失败"的判定失真，
+                    // 后面自动重载时那几张已经不在容器里，补不回来
+                    if (failCount + okCount < initialList.length) return;
+                    if (okCount === 0 && !autoRetried && !inner.querySelector('.mb-kantu-invalid-tip')) {
+                        // 图床偶发连接级错误（ERR_HTTP2_PROTOCOL_ERROR、连接被重置）会让整帖的图一起失败，
+                        // 这类错误重连一次基本就恢复。先自动重载一次（1 秒后重设 src），仍全挂才给失败提示，
+                        // 避免用户白点一次 [重试]。每帖只自动重试一次，不会无限循环。
+                        autoRetried = true;
+                        failCount = 0;
+                        setTimeout(() => {
+                            inner.querySelectorAll('.mb-kantu-thumb').forEach(t => {
+                                const u = t.dataset.src;
+                                if (!u) return;
+                                t.style.visibility = '';
+                                t.removeAttribute('src');
+                                t.src = u;
+                            });
+                        }, 1000);
+                        return;
+                    }
+                    // 部分成功，或自动重载过一轮仍全挂：删掉所有没解码出尺寸的图
+                    inner.querySelectorAll('.mb-kantu-thumb').forEach(t => { if (t.naturalWidth === 0) t.remove(); });
+                    if (okCount === 0 && !inner.querySelector('.mb-kantu-invalid-tip')) {
+                        // 兜底：若之前有图先解码把条带撑开了、最后却全部报错，先把高度退回起点高度，
+                        // 免得停在 200px 再塌成一行时整页内容往上蹿
+                        if (stripExpanded) {
+                            stripExpanded = false;
+                            inner.querySelectorAll('.mb-kantu-thumb').forEach(t => { t.style.height = CONST.KANTU_START_H + 'px'; });
+                        }
+                        // 图全删光后「+」按钮仍撑 200px 高，一并移除，整块只留一行提示
+                        const moreEl = inner.querySelector('.mb-kantu-more');
+                        if (moreEl) moreEl.remove();
+                        const tip = document.createElement('div');
+                        tip.className = 'mb-kantu-invalid-tip';
+                        tip.textContent = '原帖图片加载失败';
+                        // 图链失效有两种可能：真挂了，或缓存/服务端仍给着旧地址而帖内其实能看。
+                        // 给一个 [重试]：清该帖缓存后重新抓取，拿到新链接就能恢复；真挂了只是再失败一次。
+                        if (typeof onRetry === 'function') {
+                            const retryBtn = document.createElement('button');
+                            retryBtn.type = 'button';
+                            retryBtn.textContent = '[重试]';
+                            retryBtn.className = 'mb-kantu-retry-btn';
+                            retryBtn.onclick = (e) => { e.stopPropagation(); e.preventDefault(); onRetry(); };
+                            tip.appendChild(document.createTextNode(' '));
+                            tip.appendChild(retryBtn);
+                        }
+                        inner.insertBefore(tip, inner.firstChild || null);
+                    }
                 };
                 img.onclick = (e) => { e.stopPropagation(); Gallery.open(fullSrcList, idx, postTitle, null, 0, true, img); };
                 img.dataset.src = picUrl;
@@ -2572,7 +2905,7 @@
                 const more = document.createElement('div');
                 more.className = 'mb-kantu-more';
                 more.innerHTML = '<div style="width:60px;height:60px;border-radius:50%;background:var(--mb-border);display:flex;align-items:center;justify-content:center;color:var(--mb-text-muted);font-size:28px;font-weight:bold;">+</div>';
-                more.style.cssText = 'height:' + thumbH + 'px; width:100px; display:flex; align-items:center; justify-content:center; flex-shrink:0; cursor:pointer;';
+                more.style.cssText = 'height:' + (stripExpanded ? thumbH : CONST.KANTU_START_H) + 'px; width:100px; display:flex; align-items:center; justify-content:center; flex-shrink:0; cursor:pointer;';
                 more.title = `还有 ${fullSrcList.length - initialList.length} 张图片，点击查看全部`;
                 more.onclick = (e) => { e.stopPropagation(); Gallery.open(fullSrcList, 0, postTitle, null, 0, false, more); };
                 inner.appendChild(more);
@@ -2588,7 +2921,10 @@
             this.queueRunning = true;
             try {
                 while (this.requestQueue.length > 0) {
+                    // 出队取 rank 最小者：用户主动触发的 0 排在持续加载批量预取的 3 前面
+                    this.requestQueue.sort((a, b) => (a.__rank || 0) - (b.__rank || 0));
                     const batch = this.requestQueue.splice(0, CONST.QUEUE_CONCURRENCY);
+                    Util.log('debug', '[队列] 出队 tid=[' + batch.map(f => f.__tid).join(',') + '] rank=[' + batch.map(f => f.__rank || 0).join(',') + '] 剩余=' + this.requestQueue.length);
                     // 单任务加硬上限：请求返回了但后续处理没走完、或连接挂住时，15s 的请求超时兜不住，
                     // 这里是最后一道闸——超时也计入完成，队列绝不会被一个任务永久锁死
                     await Promise.all(batch.map(fn => Promise.race([
@@ -2602,20 +2938,27 @@
                 }
             } finally {
                 this.queueRunning = false;
+                // 极窄竞态：主循环判定队列为空之后、这里置 false 之前又有任务入队，补一次唤起
+                if (this.requestQueue.length > 0) this.runQueue();
             }
         },
         _setFabState(state) {
             this._fabState = state;
-            const fabBtn = this.fab && this.fab.el && this.fab.el.querySelector('.mb-fab-btn');
-            if (!fabBtn) return;
-            fabBtn.classList.remove('mb-loading', 'mb-continuous', 'mb-paused');
-            fabBtn.title = '';
-            // paused 时给 body 加 class，CSS 自动隐藏所有图片预览（包括新加载的）
+            // 状态只在这一处写。idle 有两种来路（从未开始 / 停止后回闲），所以 _stopped 不能一刀切，
+            // 否则初始化那次 idle 就会把普通模式的预览懒加载整个挡住
+            if (state === 'loading') { this._continuous = true; this._stopped = false; }
+            else if (state === 'paused') { this._continuous = false; this._stopped = true; Lazy._forceAll = false; }
+            else { this._continuous = false; Lazy._forceAll = false; }
+            // 收起动作不能依赖按钮节点：拿不到按钮时也要把预览收起来，否则状态与画面脱节
             if (state === 'paused') {
                 document.body.classList.add('mb-kantu-hidden');
             } else {
                 document.body.classList.remove('mb-kantu-hidden');
             }
+            const fabBtn = this.fab && this.fab.el && this.fab.el.querySelector('.mb-fab-btn');
+            if (!fabBtn) return;
+            fabBtn.classList.remove('mb-loading', 'mb-continuous', 'mb-paused');
+            fabBtn.title = '';
             if (state === 'loading') {
                 fabBtn.classList.add('mb-continuous');
                 fabBtn.title = '🖼️ 持续加载中 · 左键停止';
@@ -2638,6 +2981,8 @@
                     if (total > 0) {
                         this._loadTotal += total;
                         this._pageDone = false;
+                        // 新一轮从零计时，否则上一轮的停滞时长会被沿用，一新增就误判
+                        this._stallLast = -1; this._stallIdleAt = 0; this._stallHandled = false;
                         Util.showLoading(`持续加载中，新增 ${total} 个帖子…`);
                     }
                 }, 300);
@@ -2668,10 +3013,12 @@
             }
             this._startListObserver();
             const loadingStart = Date.now();
-            let lastDone = -1, idleSince = 0, stallHandled = false;   // 无进展检测：计数长时间不变即视为卡死
+            // 无进展检测的状态必须挂在实例上：翻页新增会开启新一轮，闭包局部变量在那一处改不到，
+            // 会把上一轮的停滞时长带进新一轮，新增的帖子还没开始跑就被判超时
+            this._stallLast = -1; this._stallIdleAt = 0; this._stallHandled = false;
             this._checkDoneTimer = setInterval(() => {
                 const done = this._loadDone;
-                if (done !== lastDone) { lastDone = done; idleSince = Date.now(); stallHandled = false; }
+                if (done !== this._stallLast) { this._stallLast = done; this._stallIdleAt = Date.now(); this._stallHandled = false; }
                 // 分母取实时识别到的帖子数，分子按 tid 去重，两者同口径，不会再出现 278/270
                 const known = this._countedTids.size;
                 if (done > 0 && !this._pageDone) Util.showLoading(`正在加载图片 ${done}/${known}…`);
@@ -2699,8 +3046,8 @@
                 }
                 // 兜底：队列有活或 tid 有残留，但计数已 STALL_RESET_MS 没动过 → 判定卡死，强制复位。
                 //       典型现场就是「58/59 一直挂着，点一下球就恢复」——图其实早加载完了，只是收尾条件永远不成立
-                if (!stallHandled && idleSince && Date.now() - idleSince >= CONST.STALL_RESET_MS) {
-                    stallHandled = true;
+                if (!this._stallHandled && this._stallIdleAt && Date.now() - this._stallIdleAt >= CONST.STALL_RESET_MS) {
+                    this._stallHandled = true;
                     const stuck = Array.from(this.processingTids);
                     if (Util.storage.get('mengbao.debug', false)) {
                         Util.log('debug', '持续加载判定卡死，强制复位', {
@@ -2718,7 +3065,7 @@
                         clearInterval(this._checkDoneTimer); this._checkDoneTimer = null;
                         this._setFabState('idle');
                     }
-                    if (left > 0) Util.toast(`有 ${left} 帖加载超时，可点该帖的[重试]再试`, 2500, 'kantu');
+                    if (left > 0) Util.toast(`还有 ${left} 帖没加载完，可点该帖的[重试]再试`, 2500, 'kantu');
                 }
             }, CONST.POLL_INTERVAL_MS);
         },
@@ -2791,21 +3138,86 @@
             return (Number.isFinite(v) ? v : 5) * 1000;
         },
         _nextHref() {
-            // 多种分页选择器兼容：列表页/搜索页/收藏页
-            let a = document.querySelector('.pg a.nxt, a.nxt');
-            if (!a) {
-                // 兜底：找文本是"下一页"的链接
-                const links = document.querySelectorAll('a');
-                for (const l of links) {
-                    if (l.textContent.trim().includes('下一页')) { a = l; break; }
+            const httpOnly = (href) => {
+                if (!href) return null;
+                try {
+                    const u = new URL(href, location.href);
+                    return /^http(s)?:$/.test(u.protocol) ? u.href : null;
+                } catch (e) { return null; }
+            };
+            // 1) 标准下一页链接：只认真实 http(s) 地址，javascript:/# 一律不算
+            const nxt = document.querySelector('.pg a.nxt, a.nxt');
+            if (nxt) {
+                const h = httpOnly(nxt.href);
+                if (h) return h;
+            }
+            // 2) 分页区里按「当前页 +1」取真实页码链接（自动翻页后 nxt 可能被替换丢失，页码链接仍在）
+            const pg = document.querySelector('.pg');
+            const curStrong = pg ? pg.querySelector('strong') : null;
+            // 当前页基准：优先 .pg 里的 <strong>（页面实际渲染出的当前页，连续加载后仍然准确），
+            // 其次 URL 的 page 参数 / 伪静态 forum-50-2.html，最后退回内部计数。
+            // 反过来（URL 优先）会在 fetch 追加翻页后锁死在第 1 页，导致反复请求同一页。
+            const curFromUrl = (() => {
+                try {
+                    const u = new URL(location.href);
+                    const p = u.searchParams.get('page');
+                    if (p && /^\d+$/.test(p)) return parseInt(p, 10);
+                    const f = u.pathname.match(/forum-(\d+)-(\d+)\.html$/i);
+                    if (f) return parseInt(f[2], 10);
+                } catch (e) {}
+                return 0;
+            })();
+            const curStrongNum = curStrong ? parseInt((curStrong.textContent || '').trim(), 10) : 0;
+            const cur = curStrongNum || curFromUrl || this._currentPage || 0;
+            if (pg && cur > 0) {
+                const hit = Array.from(pg.querySelectorAll('a')).find(a => a.textContent.trim() === String(cur + 1) && httpOnly(a.href));
+                if (hit) return httpOnly(hit.href);
+            }
+            // 3) 文本含「下一页」的链接：限定在分页区内，避免页面别处同名链接被误当成翻页目标
+            const nextScope = pg || document;
+            const links = nextScope.querySelectorAll('a');
+            for (const l of links) {
+                if (l.textContent.trim().includes('下一页')) {
+                    const h = httpOnly(l.href);
+                    if (h) return h;
                 }
             }
-            return a ? a.href : null;
+            // 4) Discuz 自动翻页按钮的 rel：curpage 会滞后，必须校验总页数
+            const ab = document.querySelector('#autopbn');
+            if (ab) {
+                const total = parseInt(ab.getAttribute('totalpage') || '0', 10);
+                const base = cur > 0 ? cur : parseInt(ab.getAttribute('curpage') || '0', 10);
+                const rel = ab.getAttribute('rel');
+                const relPage = rel ? parseInt((rel.match(/[?&]page=(\d+)/) || [])[1] || '0', 10) : 0;
+                if (base > 0 && (!total || base + 1 <= total) && relPage === base + 1) return httpOnly(rel);
+            }
+            // 5) 兜底推算：上面都取不到真实链接时，复制当前 URL 只改 page。
+            //    必须能校验才动手——当前页读不到、或总页数读得到但已经到末页，都维持 null 不乱翻
+            if (cur > 0) {
+                const abNode = document.querySelector('#autopbn');
+                const totalRaw = abNode ? parseInt(abNode.getAttribute('totalpage') || '0', 10) : 0;
+                const total = Number.isFinite(totalRaw) && totalRaw > 0 ? totalRaw : 0;
+                // 必须能校验才动手：总页数读不到就维持 null，不做无条件推算
+                if (total && cur + 1 <= total) {
+                    try {
+                        const u = new URL(location.href);
+                        // 只改 page，其余 query 原样保留（搜索页的 searchid 丢了会翻出空结果）
+                        u.searchParams.set('page', String(cur + 1));
+                        const h = httpOnly(u.href);
+                        if (h) {
+                            Util.log('debug', '「翻页」无真实链接，按当前 URL 推算到第 ' + (cur + 1) + ' 页');
+                            return h;
+                        }
+                    } catch (e) {}
+                }
+            }
+            return null;
         },
         _buildFabButton() {
             this._fab = createFab({
                 module: 'fanye',
                 storageKey: 'mengbao.fanye.fab_pos',
+                snapSource: true, snapTarget: true,
                 defaultPos: { left: 24, bottom: 200 },
                 onClick: () => {
                     if (this._continuous) { this._setContinuous(false); return; }
@@ -2873,13 +3285,47 @@
                 if (href) this._loadNext(href);
             }, ms);
         },
-        _replacePager(doc) {
+        _replacePager(doc, page) {
             const curList = Array.from(document.querySelectorAll('div.pg'));
             const nextList = Array.from(doc.querySelectorAll('div.pg'));
-            curList.forEach((cur, i) => { const next = nextList[i] || nextList[nextList.length - 1]; if (next) cur.replaceWith(next); });
+            if (!curList.length || !nextList.length) return;
+            // 完整版分页带页码列表；简版只有一个 nxt。整块用简版覆盖会把页码弄丢，
+            // 之后 _nextHref 就只剩 javascript: 伪按钮可抓，每翻一次必失败。
+            const isFull = (n) => !!n.querySelector('a.last') || n.querySelectorAll('a').length > 2;
+            curList.forEach((cur, i) => {
+                const next = nextList[i] || nextList[nextList.length - 1];
+                if (!next) return;
+                if (isFull(next)) { cur.replaceWith(next); return; }
+                const src = next.querySelector('a.nxt');
+                if (!src) return;
+                let local = cur.querySelector('a.nxt');
+                if (!local) {
+                    local = document.createElement('a');
+                    local.className = 'nxt';
+                    local.textContent = '下一页';
+                    cur.appendChild(local);
+                }
+                local.setAttribute('href', src.getAttribute('href'));
+                // 简版没有当前页标记，用本次翻到的页码同步过去，页码链接才有正确基准
+                if (page) {
+                    const st = cur.querySelector('strong');
+                    if (st) st.textContent = String(page);
+                }
+            });
         },
         async _loadNext(href) {
             this._busy = true; this._refreshBtn();
+            // 目标页码：优先从下一页地址解析，解析不到按当前页 +1 兜底。
+            // 原先两处 this._currentPage = targetPage 引用了从未定义的变量，每翻必抛 ReferenceError，
+            // 内容其实已追加成功，却被同一层 catch 网住报成"加载失败"
+            const targetPage = (() => {
+                const s = String(href || '');
+                const m = s.match(/[?&]page=(\d+)/)
+                    || s.match(/thread-\d+-(\d+)-\d+\.html/)
+                    || s.match(/(?:forum|list)-\d+-(\d+)\.html/);
+                const n = m ? parseInt(m[1], 10) : 0;
+                return n > 0 ? n : ((this._currentPage || 1) + 1);
+            })();
             let appended = 0;
             try {
                 // 小黑屋页：翻页按钮是 a#darkroommore（javascript:;），直接点击触发页面自带AJAX
@@ -2906,6 +3352,10 @@
                         this._currentPage = targetPage;
                         if (this._pageLabel) { this._pageLabel.textContent = `共 ${this._currentPage} 页`; this._pageLabel.style.display = ''; }
                         Util.toast(`已加载成功一页，新增 ${appended} 个用户`, 2000, 'fanye');
+                        // 追加进来的行不会自动带上已读标记，补标一次
+                        Util.safeRun('翻页后重标已读', () => {
+                            if (Util.storage.get('mengbao.browse.enabled', true)) BrowseHistory.markList();
+                        });
                     } else {
                         const stillThere = !!document.querySelector('a#darkroommore');
                         if (stillThere) {
@@ -2926,10 +3376,24 @@
                     'Upgrade-Insecure-Requests': '1'
                 });
                 const doc = Util.parseHtml(html);
+                // 只有「一个列表容器都没有」时才可能是限流页；正常页直接跳过，避免把页头公告误判成限流
+                // 个人页/收藏页用的是 delform 表格或 .bm_c，不是 .tl，这里一并认上
+                const hasListNow = !!doc.querySelector('#threadlisttableid, #threadlist, .tl, .pbw, td.icn, form#delform table, form[name="delform"] table, .bm_c table');
+                if (!hasListNow) {
+                    const rate = Util.detectRateLimit(doc);
+                    if (rate) {
+                        Util.hideLoading();
+                        this._failCount = 0;
+                        this._backoffMs = Math.max(5000, rate.waitSec * 1000);
+                        Util.log('warn', '[翻页] 限流', href, rate.msg);
+                        Util.toast('论坛限流：' + rate.msg + '，约 ' + Math.round(this._backoffMs / 1000) + ' 秒后重试', 3200, 'fanye');
+                        return;
+                    }
+                }
                 appended = isForumListPage() ? this._appendForumRows(doc)
                     : isSpaceFavPage() || isGuidePage() || isSpaceThreadPage() || isSpaceReplyPage() ? this._appendSpaceRows(doc)
                     : this._appendSearchRows(doc);
-                this._replacePager(doc);
+                this._replacePager(doc, targetPage);
                 Util.safeRun('翻页后归位游离行', () => this._reparentNakedRows());
                 Util.hideLoading();
                 // 翻页后清掉孤立的预览节点（缓存命中的由 kantu 下次扫描时重建）
@@ -2950,19 +3414,41 @@
                             Mengbao.Guolv.renderSectionButtons();
                         }
                     });
+                    // 追加进来的行不会自动带上已读标记，补标一次
+                    Util.safeRun('翻页后重标已读', () => {
+                        if (Util.storage.get('mengbao.browse.enabled', true)) BrowseHistory.markList();
+                    });
                 } else {
-                    Util.toast('已是最后一页', 1500, 'fanye');
+                    // 有列表容器才算「最后一页」；连容器都没有，多半是被拦截或登录失效
+                    if (!hasListNow) {
+                        this._failCount = (this._failCount || 0) + 1;
+                        Util.log('warn', '[翻页] 内容异常', href, '响应里没有列表容器');
+                        Util.toast('翻页返回的不是列表页，可能被拦截或需要重新登录', 3200, 'fanye');
+                    } else {
+                        Util.toast('已是最后一页', 1500, 'fanye');
+                    }
                 }
             } catch (e) {
                 Util.hideLoading();
                 const msg = (e && e.message) || 'unknown';
-                Util.log('error', '[翻页] 请求失败', href, msg);
-                // 区分失败原因，别再统一报"请刷新重试"，那样排不出问题
+                // 日志按原因分级，排查时不用再猜是限流还是内容问题
+                let kind = '网络失败';
+                if (/HTTP (503|429)/.test(msg)) kind = '限流';
+                else if (/timeout/i.test(msg)) kind = '超时';
+                else if (/HTTP (4|5)/.test(msg)) kind = '被拒绝';
+                Util.log('error', '[翻页] ' + kind, href, msg);
                 this._failCount = (this._failCount || 0) + 1;
                 // 503/429 是限流，属于暂时状态：等更久再试，别直接放弃
                 if (/HTTP (503|429)/.test(msg)) {
+                    // 服务器给了 Retry-After 就按它等，没给才回落到固定阶梯
+                    let waitSec = 0;
+                    try {
+                        const h = (e && e.headers) || '';
+                        const m = h.match(/retry-after\s*:\s*(\d+)/i);
+                        if (m) waitSec = Math.min(60, Math.max(5, parseInt(m[1], 10)));
+                    } catch (err) {}
                     if (this._failCount <= 3) {
-                        this._backoffMs = [12000, 24000, 40000][this._failCount - 1];
+                        this._backoffMs = waitSec ? waitSec * 1000 : [12000, 24000, 40000][this._failCount - 1];
                         Util.toast(`服务器限流（${msg}），${this._backoffMs / 1000} 秒后重试（第 ${this._failCount}/3 次）`, 3000, 'fanye');
                     } else {
                         Util.toast('连续被限流，已停止自动翻页。建议把「翻页延时」调大，或过几分钟再试', 3200, 'fanye');
@@ -3155,6 +3641,7 @@
             this.fab = createFab({
                 module: 'guolv', panelClass: 'mb-guolv-panel',
                 storageKey: 'mengbao.guolv.fab_pos_v2',
+                snapTarget: true,
                 defaultPos: { left: 24, bottom: 720 },
                 onClick: (fab) => { fab.togglePanel(); requestAnimationFrame(() => this.renderSectionButtons()); },
                 onContextMenu: () => this.openSettingDialog(),
@@ -3491,6 +3978,10 @@
 
         // 初始化：识别当前用户、加载本地缓存、构建悬浮球、等待公共脚本就绪
         init() {
+            // 点击委托只挂 document 监听，既不依赖论坛公共脚本，也不依赖后面初始化是否成功，
+            // 所以放在最前面立刻绑：之前它排在 createFab / initGalleryActiveSync 之后，
+            // 中间任何一步抛错都会把它跳过，点击图片就退回 Discuz 原生 zoom
+            this.bindThreadImages();
             Util.safeRun('增强模块初始化', () => {
                 this.myUserId = this.findMyUserId();
                 this.config = Util.mergeConfig(this.config, Util.storage.get('mengbao.zengqiang.main', null));
@@ -3522,7 +4013,6 @@
                         }
                         //          这里再建一次内容完全相同，只是白白重排一遍
                         this.initGalleryActiveSync();
-                        this.bindThreadImages();
                     }
                 });
             });
@@ -3668,9 +4158,21 @@
                 if (!target || typeof target.getBoundingClientRect !== 'function') return;
                 const r = target.getBoundingClientRect();
                 if (!r.height && !r.width) return;
-                const top = r.top + window.scrollY - Math.max(0, (window.innerHeight - r.height) / 2);
+                // 顶部对齐而不是居中：附件区常在文档末尾，居中会把 top 算到可滚最大值，首点直接见底
+                const top = r.top + window.scrollY - 72;
                 try { window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' }); }
                 catch (e) { window.scrollTo(0, Math.max(0, top)); }
+                // 附件里的预览图加载完高度会变，稍后再校一次，只在偏差明显时才补滚
+                setTimeout(() => {
+                    if (!target.isConnected) return;
+                    const r2 = target.getBoundingClientRect();
+                    if (!r2.height && !r2.width) return;
+                    const top2 = r2.top + window.scrollY - 72;
+                    if (Math.abs(top2 - top) > 40) {
+                        try { window.scrollTo({ top: Math.max(0, top2), behavior: 'smooth' }); }
+                        catch (e) { window.scrollTo(0, Math.max(0, top2)); }
+                    }
+                }, 300);
             };
             const findLinkBlock = () => document.querySelector('.blockcode') || document.querySelector('.hidecontent');
             if (findLinkBlock()) addBtn('🧲 链接', () => scrollToTarget(findLinkBlock()), '滚动到本帖的链接/隐藏内容区');
@@ -3690,8 +4192,10 @@
         },
         initGalleryActiveSync() {
             if (this._galleryObserver) return;
+            const root = document.body || document.documentElement;
+            if (!root) return;
             this._galleryObserver = new MutationObserver(() => this.syncGalleryFabActive());
-            this._galleryObserver.observe(document.body, { childList: true });
+            this._galleryObserver.observe(root, { childList: true });
         },
         // 收藏/取消收藏：简化逻辑，避免占位 true 导致的循环问题
         // 收藏成功后存 1（占位），取消时如果没有 favoriteId 就先同步一次
@@ -3928,6 +4432,9 @@
         // 绑定详情页图片点击事件（事件委托，强行接管看图）
         bindThreadImages() {
             if (!isThreadPage()) return;
+            // 幂等：init 可能被多处调用，重复绑定会让一次点击开两遍画廊
+            if (this._imgClickBound) return;
+            this._imgClickBound = true;
             
             // 用事件委托，在document上监听点击事件
             document.addEventListener('click', (e) => {
@@ -4055,7 +4562,7 @@
                     </div>
                     <div class="mb-setting-row">
                         <label title="浏览过的帖子怎么标记：关闭 / 变灰并划线 / 只变灰不划线">已读帖子：</label>
-                        <select class="set-browse-mode mb-input-base">
+                        <select class="set-browse-mode mb-input-base" title="浏览过的帖子怎么标记：选「关闭」则不再标记，也不再记录浏览历史（已记录的历史保留）；选「变灰划线」或「只变灰」会继续记录">
                             <option value="off" ${browseMode === 'off' ? 'selected' : ''}>关闭</option>
                             <option value="strike" ${browseMode === 'strike' ? 'selected' : ''}>变灰划线</option>
                             <option value="gray" ${browseMode === 'gray' ? 'selected' : ''}>只变灰</option>
@@ -4729,8 +5236,10 @@
     // ===================== 全量配置导出 / 导入 =====================
     // 备份集合由 schema 的 backup 标记生成，不再维护硬编码键列表
     const collectBackupKeys = () => Cfg.backupKeys();
-    // 已下线功能的设置键（内置头像、评论面板收藏）：导入时忽略，不阻断整批导入
-    const LEGACY_BACKUP_KEYS = ['mengbao.avatar.builtinDeleted', 'mengbao.comment.favorite'];
+    // 已下线功能的设置键（内置头像、评论面板收藏）、以及退出备份范围的头像库：导入时忽略，不阻断整批导入
+    const LEGACY_BACKUP_KEYS = ['mengbao.avatar.builtinDeleted', 'mengbao.comment.favorite', 'mengbao.avatars.user'];
+    // 账号态数据：跨账号导入时跳过，避免已读标灰、已评分误显示、收藏状态错乱
+    const ACCOUNT_STATE_KEYS = ['mengbao.zengqiang.favorite', 'mengbao.zengqiang.rated', 'mengbao.browse.history'];
     function bindFullBackup(container) {
         const exportBtn = container.querySelector('.btn-export-all');
         if (exportBtn) {
@@ -4738,11 +5247,14 @@
                 const payload = {};
                 // 只写真正设置过的键：未设置的键不写 null，导出的 JSON 更干净，回导也不会被当成脏键
                 collectBackupKeys().forEach(k => {
-                    const v = Util.storage.get(k, null);
+                    // 用户数据类键存的是按 uid 分桶的结构，导出只取当前登录用户那一份；
+                    // 整桶搬过去的话，换号导入时桶键对不上，位置/历史/收藏全部读不到
+                    const v = USER_STORE_KEYS.includes(k) ? Util.userStore.get(k, null) : Util.storage.get(k, null);
                     if (v !== null && v !== undefined) payload[k] = v;
                 });
                 const ver = (typeof GM_info !== 'undefined' && GM_info.script) ? GM_info.script.version : 'unknown';
-                const text = JSON.stringify({ version: ver, exportedAt: Date.now(), data: payload }, null, 2);
+                // 记录来源 uid：跨账号导入时据此跳过收藏/评分/已读，避免串号
+                const text = JSON.stringify({ version: ver, exportedAt: Date.now(), uid: Util.userStore.curBucket(), data: payload }, null, 2);
                 const modal = openModal({
                     width: 'sm',
                     body: `
@@ -4783,6 +5295,9 @@
                         const parsed = JSON.parse(text);
                         const data = parsed && parsed.data ? parsed.data : parsed;
                         if (typeof data !== 'object' || data === null || Array.isArray(data)) throw new Error('格式不正确');
+                        // 导出时记录了来源 uid：与当前登录账号不同即视为跨账号导入
+                        const srcUid = parsed && parsed.uid !== undefined && parsed.uid !== null ? String(parsed.uid) : '';
+                        const crossAccount = !!srcUid && srcUid !== Util.userStore.curBucket();
                         const allow = new Set(collectBackupKeys());
                         const backup = {};
                         allow.forEach(k => { backup[k] = Util.storage.get(k, null); });
@@ -4793,10 +5308,13 @@
                                 if (LEGACY_BACKUP_KEYS.indexOf(k) > -1) ignored.push(k); else skipped.push(k);
                                 return;
                             }
+                            // 跨账号导入：收藏/评分/已读属于原账号，跳过而不是搬进新账号
+                            if (crossAccount && ACCOUNT_STATE_KEYS.indexOf(k) > -1) { ignored.push(k); return; }
                             // 旧版导出会把未设置的键写成 null：跳过而不参与校验，否则会被误判为“无法识别”并整批取消
                             if (data[k] === undefined || data[k] === null) return;
                             if (!Cfg.validate(k, data[k])) { skipped.push(k); return; }
-                            if (USER_STORE_KEYS.includes(k) && Util.userStore.isOldStyle(k, data[k])) {
+                            if (USER_STORE_KEYS.includes(k)) {
+                                // 导出已按当前用户取值，这里一律写回当前用户桶；旧版裸结构同样按值写入
                                 Util.userStore.setFor(k, Util.userStore.curBucket(), data[k]);
                             } else {
                                 Util.storage.set(k, data[k]);
@@ -4814,7 +5332,7 @@
                             return;
                         }
                         modal.close();
-                        Util.toast('导入成功 ' + applied + ' 项' + (ignored.length ? '，忽略 ' + ignored.length + ' 个过期设置' : '') + '，刷新后生效', 2600, 'success');
+                        Util.toast('导入成功 ' + applied + ' 项' + (ignored.length ? '，忽略 ' + ignored.length + ' 个不适用项' : '') + (crossAccount ? '（来源为其他账号，收藏/评分/已读已跳过）' : '') + '，刷新后生效', 2600, 'success');
                     } catch (e) {
                         Util.toast('导入失败：' + e.message, 2000, 'error');
                     }
@@ -5369,7 +5887,15 @@
             if (!m) return;
             const uid = m[1];
             const isFav = !!favoriteUsers[uid];
-            Util.log('debug', '[收藏高亮] 作者 uid=' + uid, '收藏=' + isFav, '收藏键存在=' + Object.prototype.hasOwnProperty.call(favoriteUsers, uid));
+            // 逐行打印一次列表能刷 250+ 条，把真正的 [翻页] 请求失败 淹掉；
+            // 只在命中收藏时留痕，且同一 uid 每次会话只打一行（多轮扫描会重复扫到同一行）
+            if (isFav) {
+                if (!Util._favLogOnce) Util._favLogOnce = Object.create(null);
+                if (!Util._favLogOnce[uid]) {
+                    Util._favLogOnce[uid] = 1;
+                    Util.log('debug', '[收藏高亮] 命中收藏 uid=' + uid);
+                }
+            }
             const userInfo = authorLink.parentElement;
             if (userInfo) bindUserJumpMenu(userInfo, uid);
             // 注意：不能只在"首次挂按钮"时染色。按钮已在时 attachBtn 会提前返回，
@@ -5693,15 +6219,32 @@
         },
         markList() {
             if (!Util.storage.get('mengbao.browse.enabled', true)) return;
+            // 节流：切标签页、窗口聚焦、翻页重标会连着触发，同一时间窗内只跑一轮
+            const now = Date.now();
+            if (this._lastMarkAt && now - this._lastMarkAt < 150) return;
+            this._lastMarkAt = now;
             // 底色与划线按设置注入（自定义颜色只作用于非收藏行，收藏蓝底优先级不变）
+            // 只在值变化时才写根变量，避免每轮都触发一次强制重排
             try {
-                const bg = Util.storage.get('mengbao.browse.color', '#f0f0f0');
+                const bgRaw = Util.storage.get('mengbao.browse.color', '#f0f0f0');
+                const bgv = Util.isValidColor(String(bgRaw)) ? String(bgRaw) : '#f0f0f0';
                 const strike = Util.storage.get('mengbao.browse.strike', true);
-                document.documentElement.style.setProperty('--mb-browsed-bg', Util.isValidColor(String(bg)) ? bg : '#f0f0f0');
-                document.documentElement.style.setProperty('--mb-browsed-strike', strike ? 'line-through' : 'none');
+                if (this._styleBg !== bgv) {
+                    document.documentElement.style.setProperty('--mb-browsed-bg', bgv);
+                    this._styleBg = bgv;
+                }
+                if (this._styleStrike !== strike) {
+                    document.documentElement.style.setProperty('--mb-browsed-strike', strike ? 'line-through' : 'none');
+                    this._styleStrike = strike;
+                }
             } catch (e) {}
             const h = this.get();
-            Util.log('debug', '[已读标记] bucket=' + Util.userStore.curBucket() + ' 历史条数=' + Object.keys((h.data || {})).length);
+            // 只在历史条数变化时留痕，避免一次加载刷出五六行同样的日志
+            const cnt = Object.keys((h.data || {})).length;
+            if (this._lastCount !== cnt) {
+                Util.log('debug', '[已读标记] bucket=' + Util.userStore.curBucket() + ' 历史条数=' + cnt);
+                this._lastCount = cnt;
+            }
             // 版块列表页（.tl 表格）/ 个人主题页（.tl 表格，无 td.icn）/ 搜索结果页（#threadlist .pbw）统一按行处理
             const markRows = (hist) => {
                 document.querySelectorAll('.tl tr, #threadlist .pbw').forEach(row => {
@@ -5768,6 +6311,13 @@
         // 依赖顺序：搜索 -> 看图（看图依赖搜索的 isTidHidden）-> 翻页 -> 增强 -> 设置页 -> 收藏按钮
         // 错误统一由外层 Util.safeRun 记录（含日志与提示），模块内不再各自 console.error
         try { Util.userStore.migrateAllOnce(); } catch (e) { Util.log('error', '用户数据迁移失败：', e); }
+        // 已读标记只靠页面初始化跑一次，切标签页/切窗口回来都不会补标，这里给一个统一的重新标记入口
+        const refreshBrowsedMark = () => {
+            try {
+                if (!Util.storage.get('mengbao.browse.enabled', true)) return;
+                if (isForumListPage() || isSearchResultPage() || isSpaceThreadPage()) BrowseHistory.markList();
+            } catch (e) {}
+        };
         const tasks = [
             ['过滤模块', () => { if (moduleGuolv.isTargetPage()) moduleGuolv.init(); }],
             ['看图模块', () => { if (moduleKantu.isTargetPage()) moduleKantu.init(); }],
@@ -5776,33 +6326,50 @@
             ['收藏用户按钮', () => initFavUserButtons()],
             ['浏览历史', () => {
                 if (isThreadPage()) {
-                    const m = location.href.match(/tid=(\d+)/) || location.href.match(/thread-(\d+)-/);
-                    if (m) BrowseHistory.set(m[1]);
+                    // 开关关闭时完全不记账（设置「已读帖子」选「关闭」）
+                    if (Util.storage.get('mengbao.browse.enabled', true)) {
+                        const m = location.href.match(/tid=(\d+)/) || location.href.match(/thread-(\d+)-/);
+                        if (m) BrowseHistory.set(m[1]);
+                    }
                 }
                 if (isForumListPage() || isSearchResultPage() || isSpaceThreadPage()) {
                     BrowseHistory.markList();
-                    // 监听帖子链接的点击事件，点击时立即标记为已读
-                    document.addEventListener('click', (e) => {
-                        const a = e.target.closest('a[href*="mod=viewthread"]') || e.target.closest('a[href*="tid="]');
+                    // 点一下帖子：记账 + 立即涂色
+                    const markByLink = (a) => {
                         if (!a) return;
                         const m = a.href.match(/tid=(\d+)/);
-                        if (m) {
+                        // 开关关闭时既不记账也不涂色（刷新后 markList 同样会跳过）
+                        if (m && Util.storage.get('mengbao.browse.enabled', true)) {
                             BrowseHistory.set(m[1]);
-                            // 立即给这个帖子行添加已读标记
                             const row = a.closest('.tl tr') || a.closest('#threadlist .pbw');
                             if (row) row.classList.add('mb-browsed');
                         }
+                    };
+                    document.addEventListener('click', (e) => {
+                        markByLink(e.target.closest('a[href*="mod=viewthread"]') || e.target.closest('a[href*="tid="]'));
                     });
+                    // 中键点击会在新标签页打开，不触发 click，单独接一次
+                    document.addEventListener('auxclick', (e) => {
+                        if (e.button !== 1) return;
+                        markByLink(e.target.closest('a[href*="mod=viewthread"]') || e.target.closest('a[href*="tid="]'));
+                    });
+                    // 右键菜单弹出时也记账：浏览器「在新标签页中打开」走的是 contextmenu，
+                    // click 与 auxclick 都收不到，此前右键打开帖子回来一直不灰
+                    document.addEventListener('contextmenu', (e) => {
+                        markByLink(e.target.closest('a[href*="mod=viewthread"]') || e.target.closest('a[href*="tid="]'));
+                    });
+                    // 切标签页 / 切窗口回来：别处记的账这里看不到，重新标一次
+                    document.addEventListener('visibilitychange', () => {
+                        if (!document.hidden) refreshBrowsedMark();
+                    });
+                    window.addEventListener('focus', refreshBrowsedMark);
                 }
             }]
         ];
         tasks.forEach(([label, fn]) => Util.safeRun(label + '初始化', fn));
         // 监听 pageshow 事件，当页面从 bfcache 恢复时，重新标记已读帖子
-        window.addEventListener('pageshow', (e) => {
-            if (e.persisted) {
-                if (isForumListPage() || isSearchResultPage() || isSpaceThreadPage()) BrowseHistory.markList();
-            }
-        });
+        // 任何形式的页面恢复都补标一次：原先只在 bfcache（e.persisted）时执行，普通恢复同样是旧 DOM
+        window.addEventListener('pageshow', () => refreshBrowsedMark());
         setTimeout(showFirstRunGuideIfNeeded, 1500);
     }
 
