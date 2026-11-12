@@ -159,9 +159,8 @@ https://raw.githubusercontent.com/mengbao-tools/mengbao-xiaomishu/v1.6/mengbao.u
 - 只读浏览增强，不修改论坛数据
 - 所有配置存本地，无任何数据上传
 - 域名白名单机制：只在你指定的论坛站点生效，其他网站不加载
-- 仓库里的 `mengbao.user.js` 与 `mengbao.js` 内容完全相同，前者只是文件名带 `.user.js`，让脚本管理器能直接识别并弹出安装页
+- 根目录的 `mengbao.user.js` 就是当前正式版 v1.6，文件名带 `.user.js` 是为了让脚本管理器识别并弹安装页
 
 ---
 
 <sub>作者 Slient_桃萌 · 脚本内容由 AI 协助生成</sub>
-#（注：内容由AI生成）

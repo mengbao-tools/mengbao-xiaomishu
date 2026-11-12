@@ -44,20 +44,20 @@
     padding: 56px 24px 72px;
     text-align: center;
   }
-  .hero h1 { font-size: 32px; font-weight: 700; margin-bottom: 10px; letter-spacing: 1px; }
+  .hero-title { display: inline-flex; align-items: baseline; gap: 12px; }
+  .hero h1 { font-size: 32px; font-weight: 700; margin: 0; letter-spacing: 1px; }
   .hero .version {
     display: inline-block;
     background: rgba(255,255,255,0.2);
     padding: 4px 14px;
     border-radius: 20px;
     font-size: 13px;
-    margin-bottom: 18px;
   }
   .hero .tagline { font-size: 16px; opacity: 0.92; max-width: 560px; margin: 0 auto; line-height: 1.7; }
   /* ===== 容器 ===== */
-  .container { max-width: 880px; margin: -36px auto 60px; padding: 0 20px; }
+  .container { max-width: 1120px; margin: -36px auto 60px; padding: 0 20px; }
   /* ===== 亮点卡片 ===== */
-  .highlights { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 44px; }
+  .highlights { display: grid; grid-template-columns: 1fr; gap: 14px; margin-bottom: 44px; }
   .highlight-card {
     background: var(--bg); border-radius: var(--radius); padding: 22px;
     box-shadow: 0 2px 12px rgba(0,0,0,0.06);
@@ -76,7 +76,7 @@
   .section-intro { font-size: 13.5px; color: var(--text-muted); line-height: 1.75; margin-bottom: 20px; }
   .feature-section { margin-bottom: 44px; }
   /* ===== 功能板块 ===== */
-  .feature-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+  .feature-grid { display: grid; grid-template-columns: 1fr; gap: 14px; }
   .feature-item {
     background: var(--bg); border-radius: var(--radius); padding: 18px 20px;
     box-shadow: 0 1px 6px rgba(0,0,0,0.04); border-left: 3px solid var(--accent);
@@ -139,7 +139,7 @@
   .setting-row .name { font-size: 13px; font-weight: 600; color: var(--text); min-width: 118px; flex-shrink: 0; }
   .setting-row .desc { font-size: 12.5px; color: var(--text-muted); line-height: 1.65; }
   .setting-row .default { font-size: 11.5px; color: var(--text-hint); white-space: nowrap; }
-  .btn-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 4px; }
+  .btn-grid { display: grid; grid-template-columns: 1fr; gap: 10px; margin-top: 4px; }
   .btn-card {
     background: var(--bg-secondary); border-radius: 8px; padding: 12px 14px;
     font-size: 12.5px; line-height: 1.6;
@@ -158,7 +158,7 @@
   .step-content p { font-size: 13px; color: var(--text-muted); line-height: 1.65; }
   /* ===== 界面入口 ===== */
   .ui-guide { background: var(--bg); border-radius: var(--radius); padding: 26px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
-  .ui-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+  .ui-grid { display: grid; grid-template-columns: 1fr; gap: 14px; }
   .ui-item { padding: 14px; background: var(--bg-secondary); border-radius: 8px; }
   .ui-item h5 { font-size: 13.5px; font-weight: 600; margin-bottom: 5px; color: var(--accent-deep); }
   .ui-item p { font-size: 12.5px; color: var(--text-muted); line-height: 1.65; }
@@ -196,11 +196,10 @@
 
 <!-- ===== Hero ===== -->
 <div class="hero">
-  <h1>萌宝小秘书</h1>
-  <div class="version">v1.6</div>
-  <p class="tagline">
-    Discuz 论坛增强套件 —— 看图更方便、翻页更顺滑、收藏更省心
-  </p>
+  <div class="hero-title">
+    <h1>萌宝小秘书</h1>
+    <div class="version">v1.6</div>
+  </div>
 </div>
 
 <div class="container">
