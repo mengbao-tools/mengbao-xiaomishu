@@ -5,16 +5,16 @@
 // 功能：图片画廊预览、搜索过滤、自动翻页、收藏用户与帖子、
 //       评论侧边面板、浏览历史标记、自定义头像、按时间排序
 // ============================================================
-// 版本：1.6
+// 版本：1.7
 // ==UserScript==
 // @name         萌宝小秘书
 // @namespace    https://violentmonkey.mengbao.local/
-// @version      1.6
-// @updateURL    https://cdn.jsdelivr.net/gh/mengbao-tools/mengbao-xiaomishu@main/mengbao.js
-// @downloadURL  https://cdn.jsdelivr.net/gh/mengbao-tools/mengbao-xiaomishu@main/mengbao.js
+// @version      1.7
+// @updateURL    https://cdn.jsdelivr.net/gh/mengbao-tools/mengbao-xiaomishu@main/mengbao.user.js
+// @downloadURL  https://cdn.jsdelivr.net/gh/mengbao-tools/mengbao-xiaomishu@main/mengbao.user.js
 // @description  Discuz 论坛增强套件：图片画廊预览、大图查看器、搜索过滤、自动翻页、收藏用户与帖子、评论侧边面板、评分自动满分、浏览历史标记、自定义头像
 // @author       Slient_桃萌
-// @icon         https://aka.doubaocdn.com/s/ZHcpkVi54s
+// @icon         https://cdn.jsdelivr.net/gh/mengbao-tools/mengbao-xiaomishu@main/icon.png
 // @license      MIT
 // @match        *://*/*
 // 说明：这里用通配匹配而不是具体域名——部署站点可能变动、也可能同时用多个镜像域名，
@@ -77,6 +77,10 @@
         AVATAR_FETCH_TIMEOUT_MS: 10000,   // 头像抓取超时（ms）
         MUTATION_RAF_INTERVAL_MS: 16,    // DOM observer rAF 节流间隔（≈60fps）
         MAX_PENDING_MUTATIONS: 200,      // mutations 队列最大长度保护
+        HTML_POOL_CONCURRENCY: 4, // 全局 HTML 请求池并发：看图、热度、翻页共用一个闸门，避免 7 路同时撞站点
+        HTML_POOL_GAP_MS: 80, // 全局 HTML 池每次发起的间隔（ms）：一条条喂，别一口气挤出去
+        HTML_POOL_CACHE_TTL: 60000, // 同一 URL 的 HTML 复用窗口（ms）：看图与热度同抓一页，复用后请求量减半
+        HTML_POOL_CACHE_MAX: 120, // HTML 复用缓存条数上限：单页约 80KB，120 条约 10MB 上限
     };
 
     // ===================== 统一配置 Schema（所有存储键的唯一登记处） =====================
@@ -107,14 +111,16 @@
         'mengbao.zengqiang.favorite_users':  { type: 'object',   def: {}, backup: true },
         'mengbao.zengqiang.favorite_groups': { type: 'string[]', def: [], backup: true, validate: vOldOrNew(x => Array.isArray(x) && x.every(g => typeof g === 'string')) },
         'mengbao.zengqiang.favorite_users_order': { type: 'string[]', def: [], backup: true, validate: vOldOrNew(x => Array.isArray(x) && x.every(u => typeof u === 'string')) },
-        'mengbao.site.hosts':                { type: 'string[]', def: ['www.sehuatang.net', 'www.sehuatang.org', 'lw7f.srg3f.net', 'rlh8.khy1j.com', 'plwt.kpqq4.com'], backup: true, validate: v => v.every(h => /^[a-z0-9.-]+\.[a-z]{2,}$/.test(h)) },
+        'mengbao.site.hosts':                { type: 'string[]', def: ['www.sehuatang.net', 'www.sehuatang.org'], backup: true, validate: v => v.every(h => /^[a-z0-9.-]+\.[a-z]{2,}$/.test(h)) },
         'mengbao.fanye.delaySec':            { type: 'number',   def: 5, min: 0, max: 10, backup: true },
         'mengbao.debug':                     { type: 'boolean',  def: false, backup: true },
         'mengbao.browse.enabled':            { type: 'boolean',  def: true, backup: true },
         'mengbao.browse.history':            { type: 'object',   def: { time: 0, data: {} }, backup: true, validate: vOldOrNew(x => !!x && typeof x === 'object' && !Array.isArray(x) && typeof x.time === 'number' && !!x.data && typeof x.data === 'object' && !Array.isArray(x.data)) },
         'mengbao.browse.color':              { type: 'color',    def: '#f0f0f0', backup: true },
         'mengbao.browse.strike':             { type: 'boolean',  def: true, backup: true },
-        'mengbao.narrow.enabled':            { type: 'boolean',  def: false, backup: true },
+        'mengbao.page.width':               { type: 'number',   def: 1200, min: 960, max: 1200, backup: true, validate: vOldOrNew(function (x) { return typeof x === 'number' && [960, 1200].indexOf(x) !== -1; }) },
+        'mengbao.owner.meta':               { type: 'object',   def: {}, backup: false },
+        'mengbao.owner.metaEnabled':        { type: 'boolean',  def: true, backup: true },
         'mengbao.jump_target':               { type: 'enum',     def: 'home', values: ['home', 'thread', 'reply', 'off'], backup: true },
         'mengbao.favorite_highlight_bg':     { type: 'color',    def: '#dbeafe', backup: true },
         'mengbao.favorite_highlight_title':  { type: 'color',    def: '#d97706', backup: true },
@@ -393,6 +399,93 @@
                 });
             });
         },
+        // ==================== 全局 HTML 请求池 ====================
+        // GM_xmlhttpRequest 每次都是独立请求，彼此不排队：看图详情页（2 路）、热度（4 路）、
+        // 翻页（1 路）各自并发时最坏能同时撞 7 个 HTML 请求上去，站点对这类并发很敏感，
+        // 一被限流就是空页/超时，顺带把图片请求也拖慢。
+        // 这里把「所有后台抓页」统一收进一个闸门：同时最多 HTML_POOL_CONCURRENCY 个、
+        // 每次发起间隔 HTML_POOL_GAP_MS，并按 rank 分级，保证用户当前在看的那一帖永远先到。
+        //   rank 0：用户主动点开 / 当前帖（最高）
+        //   rank 1：翻页、列表可见帖
+        //   rank 2：热度与已购
+        //   rank 3：批量预取
+        _htmlPoolState: null,
+        _htmlCacheMap: null,
+        _htmlPool() {
+            if (!this._htmlPoolState) {
+                this._htmlPoolState = { queue: [], active: 0, timer: null, lastStart: 0, seq: 0 };
+            }
+            return this._htmlPoolState;
+        },
+        _htmlCache() {
+            if (!this._htmlCacheMap) this._htmlCacheMap = new Map();
+            return this._htmlCacheMap;
+        },
+        _htmlCacheGet(url) {
+            const cache = this._htmlCache();
+            const rec = cache.get(url);
+            if (!rec) return null;
+            if (Date.now() - rec.time > CONST.HTML_POOL_CACHE_TTL) {
+                cache.delete(url);
+                return null;
+            }
+            return rec.text;
+        },
+        _htmlCacheSet(url, text) {
+            const cache = this._htmlCache();
+            if (cache.size >= CONST.HTML_POOL_CACHE_MAX) {
+                // Map 保持插入顺序，直接淘汰最旧的一条
+                const first = cache.keys().next();
+                if (!first.done) cache.delete(first.value);
+            }
+            cache.set(url, { time: Date.now(), text });
+        },
+        // 走池的 HTML 抓取：命中 30 秒复用缓存就直接返回，不再发请求
+        httpGetQueued(url, opts) {
+            const o = opts || {};
+            if (!o.fresh) {
+                const hit = this._htmlCacheGet(url);
+                if (hit != null) return Promise.resolve(hit);
+            }
+            return new Promise((resolve, reject) => {
+                const pool = this._htmlPool();
+                pool.seq++;
+                pool.queue.push({ url, rank: typeof o.rank === 'number' ? o.rank : 3, seq: pool.seq, headers: o.headers || null, resolve, reject });
+                this._htmlPoolPump();
+            });
+        },
+        _htmlPoolPump() {
+            const pool = this._htmlPool();
+            if (pool.active >= CONST.HTML_POOL_CONCURRENCY) return;
+            if (!pool.queue.length) return;
+            // 间隔闸：一条一条喂，避免恢复后瞬间挤出一批
+            const now = Date.now();
+            const wait = CONST.HTML_POOL_GAP_MS - (now - pool.lastStart);
+            if (wait > 0) {
+                if (!pool.timer) {
+                    pool.timer = setTimeout(() => {
+                        pool.timer = null;
+                        this._htmlPoolPump();
+                    }, wait);
+                }
+                return;
+            }
+            pool.queue.sort((a, b) => a.rank - b.rank || a.seq - b.seq);
+            const task = pool.queue.shift();
+            pool.active++;
+            pool.lastStart = Date.now();
+            this.httpGet(task.url, task.headers || undefined)
+                .then((text) => {
+                    this._htmlCacheSet(task.url, text);
+                    task.resolve(text);
+                })
+                .catch((err) => task.reject(err))
+                .then(() => {
+                    pool.active--;
+                    this._htmlPoolPump();
+                });
+            this._htmlPoolPump(); // 并发没满就继续填
+        },
         httpPost(url, body) {
             return new Promise((resolve, reject) => {
                 const headers = {};
@@ -553,7 +646,9 @@
         'mengbao.guolv.fab_pos_v2',
         'mengbao.guolv.fab_pos_fold',
         'mengbao.zengqiang.fab_pos',
-        'mengbao.zengqiang.fab_pos_fold'
+        'mengbao.zengqiang.fab_pos_fold',
+        'mengbao.page.width',
+        'mengbao.owner.metaEnabled'
     ];
     let _currentUserId = -1;
     let _currentUserIdResolved = false;
@@ -790,7 +885,7 @@
     const MB_VERSION = (typeof GM_info !== 'undefined' && GM_info && GM_info.script && GM_info.script.version) ? GM_info.script.version : 'unknown';
 
     // ===================== 域名白名单（@match 通配由 JS 守卫；设置页可编辑） =====================
-    // 默认白名单域名（清空自定义配置时回落此项）：1.0 起内置 5 个常用站群域名，精确匹配 hostname
+    // 默认白名单域名（清空自定义配置时回落此项）：内置 2 个常用站群域名，精确匹配 hostname
     const DEFAULT_HOSTS = Cfg.def('mengbao.site.hosts');
     let TARGET_HOSTS = Util.storage.get('mengbao.site.hosts', DEFAULT_HOSTS);
     if (!Array.isArray(TARGET_HOSTS) || !TARGET_HOSTS.length) TARGET_HOSTS = DEFAULT_HOSTS;
@@ -854,56 +949,124 @@
             --mb-z-gallery:2147484000; --mb-z-single:2147484500;
             --mb-gallery-bg:${galleryBg}; --mb-gallery-cell:${galleryCell};
             --mb-favorite-on:#f5a623;
+            --mb-text-danger:#d93025;
             --mb-favorite-highlight-bg:${favoriteHlBg}; --mb-favorite-highlight-title:${favoriteHlTitle};
             /* 布局尺寸变量（集中管理） */
             --mb-dialog-width-sm:460px;      /* 弹窗外框宽（小：提示/确认/白名单等） */
             --mb-dialog-width-md:548px;      /* 弹窗外框宽（中：收藏馆） */
             --mb-dialog-width-lg:600px;      /* 弹窗外框宽（大：仅通用设置，两列控件右对齐后 600 更匀称） */
-            --mb-page-width:1200px;          /* 版心宽度：窄屏模式开启时由 JS 覆盖为 960 */
+            --mb-page-width:1200px;          /* 版心宽度（窄档）：由 JS 按设置覆盖为 960 / 1200 */
         }
-        /* 窄屏模式：仅论坛窄档生效（全屏档 html 带 widthauto，自动放开）。四个居中容器必须同步收窄，
-           否则只改 #wp 会让 #nv 导航条和 #ft 页脚比正文宽出 240px，左右各错位 120px。
-           min-width:0 必须写——全屏档 #wp 带 min-width:1200px 兜底，不清掉改了等于没改。
-           margin:auto 必须写——#nv/#ft 的父容器是外层外壳，只改宽度会贴左不居中。 */
-        html.mb-narrow-mode:not(.widthauto) #wp,
-        html.mb-narrow-mode:not(.widthauto) #ct,
-        html.mb-narrow-mode:not(.widthauto) #nv,
-        html.mb-narrow-mode:not(.widthauto) #ft {
+        /* 版心宽度（窄档）：论坛窄档现为 960（原 1200），这里按设置把窄档版心重设回 1200（默认），可选 960 / 1200。
+           两档语义：960 = 不开宽版，不挂 mb-page-width class，完全交回论坛原生窄档；
+                    1200 = 开宽版，还原论坛旧版版心，全站生效。
+           仅论坛窄档生效（全屏档 html 带 widthauto，自动放开）。四个居中容器必须同步，
+           否则只改 #wp 会让 #nv 导航条和 #ft 页脚比正文宽出几百像素，左右各错位。
+           min-width:0 必须写——#wp 可能自带 min-width 兜底，不清掉改了等于没改。
+           margin:auto 必须写——#nv/#ft 的父容器是外层外壳，只改宽度会贴左不居中。
+
+           ===== 版心宽度实测基线（2026-11-15 实测，论坛若再改版心先对照这张表）=====
+           不开宽（960 原生）：#wp / #ct 宽 960、min-width:0；
+                              首页左栏 .frame-1-2-l 320 / 右栏 .frame-1-2-r 640；
+                              空间页左栏 137 / 右栏 .mn 固定 800。
+           开宽（1200 脚本）： #wp / #ct 宽 1200 居中（视口 1314 时 left=57、right=1257）；
+                              首页左栏 320 / 右栏 calc(100% - 320px)=880；
+                              轮播每屏 li 内联 310×275 不动，图片右到面板 10px；
+                              空间页 .ct2_a 内 .mn 改为 calc(100% - 160px)，内部 table 100%；
+                              帖子页 .plc 1038 / .t_f 997；
+                              列表行两侧内边距 左右各 11px（论坛原生 padding，对称属正常）。
+           全屏档 html.widthauto：#wp 实测 1302.41 全屏自适应；脚本用 :not(.widthauto) 排除，不覆盖。
+           轮播结构：ul.slideshow 内 12 个直接子 li，display:none 单屏切换，无 transform 位移；
+                     .frame-1-2-l 容器内 li 总数约 30 个（含缩略数字条），改尺寸必须限定 ul.slideshow > li。 */
+        html.mb-page-width:not(.widthauto) #wp,
+        html.mb-page-width:not(.widthauto) #ct,
+        html.mb-page-width:not(.widthauto) #nv,
+        html.mb-page-width:not(.widthauto) #ft {
             width:var(--mb-page-width) !important;
             min-width:0 !important;
             margin-left:auto !important;
             margin-right:auto !important;
         }
-        /* 搜索栏不在 #wp/#ct 里，是论坛独立的 #scbar（实测 1200 居中、class="cl"），不单独收窄就会比内容宽 240 */
-        html.mb-narrow-mode:not(.widthauto) #scbar {
+        /* #nv 是 position:fixed（实测 left 57 / 宽 1200 / z 199 常驻吸顶），它的 left 是视口坐标，
+           而 #wp 是居中的文档流元素。窗口宽 1314 时两者刚好都落在 57，看起来正常；
+           窗口一旦变宽，#wp 的 left 变成 (视口-1200)/2，fixed 的 #nv 却还停在视口 57，
+           导航条「论坛/新帖瀑布流/导读/勋章/签到/排行榜」就整体左偏，越宽偏得越多。
+           办法是把 fixed 的左右两端都钉住（left:0;right:0），margin:auto 才会按视口居中。 */
+        html.mb-page-width:not(.widthauto) #nv {
+            left:0 !important;
+            right:0 !important;
+        }
+        /* 搜索栏不在 #wp/#ct 里，是论坛独立的 #scbar，不单独改就会比内容宽出同样一截 */
+        html.mb-page-width:not(.widthauto) #scbar {
             width:var(--mb-page-width) !important;
             min-width:0 !important;
             box-sizing:border-box !important;
             margin-left:auto !important;
             margin-right:auto !important;
         }
-        /* 页头：logo、右上用户信息、顶部工具条（设为首页/收藏本站）都装在 #hd / #toptb 里的 div.wp
-           （实测 1200 宽、css宽 1200px、左 47），不一起收就会停在 1200 的位置，比 960 的正文左右各外突 120px。
+        /* 页头：logo、右上用户信息、顶部工具条（设为首页/收藏本站）都装在 #hd / #toptb 里的 div.wp，
+           不一起改就会停在论坛自己的宽度上，比正文左右各外突一截。
            只动内层 .wp，外层 #hd 的花纹背景继续通栏，不会切掉背景。 */
-        html.mb-narrow-mode:not(.widthauto) #hd > .wp,
-        html.mb-narrow-mode:not(.widthauto) #toptb > .wp {
+        html.mb-page-width:not(.widthauto) #hd > .wp,
+        html.mb-page-width:not(.widthauto) #toptb > .wp {
             width:var(--mb-page-width) !important;
             min-width:0 !important;
             margin-left:auto !important;
             margin-right:auto !important;
         }
-        /* 窄屏是否生效由 JS 的 isNarrowEligible 决定，不在这里做页面排除：
-           只有版块列表（pg_forumdisplay）、导读（pg_guide）、帖子（pg_viewthread）、
-           搜索页（search.php，该页 body 无 class 只能按路径认）才挂 mb-narrow-mode。
-           首页、个人中心设置、勋章、排行榜等一律不挂，保持论坛原样。
-           白名单写在 JS 的 isNarrowEligible 里，所以上面几条规则不需要额外条件。 */
-        /* 搜索页例外：它没有 #wp/#nv，页脚本身就是通栏（实测 #ft 1294 全宽），强行收窄会在两侧露白底，单独放开 */
-        html.mb-narrow-mode:not(.widthauto):has(#threadlist.mb-search-card) #ft {
-            width:auto !important;
-            min-width:0 !important;
-            margin-left:0 !important;
-            margin-right:0 !important;
+        /* 版心宽度全站生效（论坛整体已从 1200 收到 960，只在阅读页放开会「个别宽、整体窄」）：
+           只要设定值不是 960，JS 就给 html 挂 mb-page-width，上面几条规则随之覆盖全部窄档页面。
+           全屏档仍由 :not(.widthauto) 排除，设置 960 时不挂 class，完全交给论坛。 */
+        /* 搜索页例外：它没有 #wp/#nv，页脚本身就是通栏，强行改宽会在两侧留白，单独放开 */
+        @supports selector(:has(*)) {
+            html.mb-page-width:not(.widthauto):has(#threadlist.mb-search-card) #ft {
+                width:auto !important;
+                min-width:0 !important;
+                margin-left:0 !important;
+                margin-right:0 !important;
+            }
         }
+        /* 首页顶部「轮播 + 热门主题」：论坛的 1-2 分栏，左 .frame-1-2-l / 右 .frame-1-2-r。
+           版心 960 时代是 320 / 640；拉回 1200 后论坛按比例放大成 400 / 799，
+           但轮播每屏是 li 内联写死的 310×275，图片不跟着放大，
+           左栏只要给 400，右侧就空出约 90px，看着像两栏隔了一大块空白。
+           结论：不动轮播元素（尺寸、高度、缩略条全部交回论坛原生），
+           只把左栏固定回 960 时代的 320 —— 原生图 310 + 右侧 10px 留白，
+           构图与 960 原生完全一致；多出来的宽度全部交给右栏（880）。
+           历史教训：曾把 li/a/img 一起放大到 380/400 想让图铺满，
+           结果把缩略数字条的 li 也撑大导致竖排，且高度被抬高，全部作废。
+           只作用于首页 .index-top-frame，其它页面的两栏（空间页等）在下面另有一套规则。 */
+        html.mb-page-width:not(.widthauto) .index-top-frame .column.frame-1-2-l {
+            width:320px !important;
+        }
+        html.mb-page-width:not(.widthauto) .index-top-frame .column.frame-1-2-r {
+            width:calc(100% - 320px) !important;
+        }
+        /* 空间类页面（我的、消息、设置、收藏、提醒、积分、用户组等）的通用两栏：
+           右侧主内容 .mn 和它里面的表格都写死 800，左栏固定 137，
+           960 时代 137 + 23 + 800 正好，1200 后多出的 240 全变成中间空隙。
+           实测这几页的 body class 并不统一（我的帖子 pg_space、设置页 pg_spacecp），
+           .mn 也不一定带 pbw（只有「我的帖子」带），所以按结构标志 .ct2_a 认页面：
+           凡是 .ct2_a 两栏容器（宽 1202）里的 .mn，都让它吃满剩余宽度，左栏和间距不动。 */
+        html.mb-page-width:not(.widthauto) body:not(.mb-ug-page) .ct2_a .mn {
+            width:calc(100% - 160px) !important;
+        }
+        html.mb-page-width:not(.widthauto) body:not(.mb-ug-page) .ct2_a .mn table {
+            width:100% !important;
+        }
+        /* 「我的帖子」/ 个人主题页：标题右侧的热度与已购小字（数据由详情页逐帖取，见 moduleOwnerMeta） */
+        .mb-owner-meta {
+            display:inline-block;
+            margin-left:10px;
+            font-size:var(--mb-font-md);
+            line-height:18px;
+            color:var(--mb-text-danger);
+            font-weight:700;
+            white-space:nowrap;
+            vertical-align:1px;
+        }
+
+        /* 详情页标题行紧跟火焰图标，间距比列表小，避免把【复制链接】挤走 */
         /* 底色与划线由 --mb-browsed-bg / --mb-browsed-strike 控制，运行时按设置注入（见 BrowseHistory.markList） */
         .mb-browsed, .mb-browsed th, .mb-browsed td {
             background:var(--mb-browsed-bg, #f0f0f0) !important;
@@ -982,7 +1145,7 @@
         body:has(#threadlist.mb-search-card) .by,
         body:has(#threadlist.mb-search-card) .pg,
         body:has(#threadlist.mb-search-card) .pgs,
-        /* 搜索页宽度对齐论坛版心。实测（2026-11-09）：窄档 #wp 固定 1200，全屏档自适应且带 min-width:1200px 兜底；搜索页限宽取 --mb-page-width，与窄屏模式共用同一变量，四页边缘始终重合。 */
+        /* 搜索页宽度对齐论坛版心。实测（2026-11-09）：窄档 #wp 固定 1200，全屏档自适应且带 min-width:1200px 兜底；搜索页限宽取 --mb-page-width，与版心配置共用同一变量，四页边缘始终重合。 */
         /* 搜索页模板没有 #wp，外层 #ct 原生按「视口减左右各 20」撑到 1254，比版心左右各宽出 27px，因此连 #ct 一并收进版心。 */
         /* 原值 1400 是按 1311 视口调宽的临时值，实绘会超出论坛版心 200px。实测搜索页是卡片垂直流、无表格列，收窄后标题仍正常折行，不挤压作者、分页等信息，视觉变化仅为个别长标题的折行位置。 */
         #threadlist.mb-search-card { max-width:var(--mb-page-width, 1200px) !important; margin:0 auto !important; float:none !important; width:100% !important; box-sizing:border-box; }
@@ -1119,11 +1282,8 @@
            「标签右侧的剩余空间」里水平居中，两列控件的中线对齐；
            以前是输入框贴右、复选框贴标签，同一列里两套对齐规则混着，右边缘参差不齐 */
         .mb-setting-row .mb-input-base { margin-left:auto; margin-right:auto; }
-        .mb-setting-row label { width:110px;color:var(--mb-text-muted);font-size:var(--mb-font-md);flex-shrink:0;text-align:left; }
+        .mb-setting-row label { width:126px;color:var(--mb-text-muted);font-size:var(--mb-font-md);flex-shrink:0;text-align:left;white-space:nowrap; }
         .mb-setting-row > *:not(label) { margin-left:auto; margin-right:auto; }
-        /* 窄屏模式「新」角标：给从 v1.3 升级上来的用户一个提示，亮到 2026-11-24 23:59:59
-           （v1.4 发布日 11-09 起 15 天）。到点只是条件不成立、不再渲染，不写存储、不改开关 */
-        .mb-new-badge { display:inline-block;margin-left:4px;padding:0 4px;border-radius:3px;background:#e5534b;color:#fff;font-size:10px;line-height:14px;font-weight:600;vertical-align:1px; }
         /* 通用输入框基础类：边框、圆角、字号、背景 */
         .mb-input-base { border:1px solid var(--mb-border); border-radius:var(--mb-radius); font-size:var(--mb-font-md); box-sizing:border-box; background:var(--mb-bg-page); outline:none; transition:border-color var(--mb-t-base), box-shadow var(--mb-t-base); padding:6px 10px; width:75px; }
         .mb-input-base:focus { border-color:var(--mb-accent); box-shadow:0 0 0 3px var(--mb-accent-soft); }
@@ -1188,7 +1348,7 @@
         .mb-fab-panel { left:0;right:auto;top:calc(100% + 8px);bottom:auto; }
         .mb-fab-panel--flip-x { left:auto;right:0; }
         .mb-fab-panel--flip-y { top:auto;bottom:calc(100% + 8px); }
-        /* 窄屏响应式 */
+        /* 小屏（弹窗）响应式 */
         @media (max-width:640px) {
             .mb-setting-grid { grid-template-columns:1fr !important; }
             .mb-setting-row label { width:auto; }
@@ -2643,7 +2803,7 @@
         //      处理完统一释放 processingTids，单任务异常隔离
         _requestPreview(url, tid, onOk, onFail, rank) {
             this.processingTids.add(tid);
-            const task = () => Util.httpGet(url).then(
+            const task = () => Util.httpGetQueued(url, { rank: rank || 2 }).then(
                 (html) => {
                     try {
                         const doc = Util.parseHtml(html);
@@ -3129,6 +3289,40 @@
         _continuousTimer: null,
         init() {
             this._buildFabButton();
+            this._adoptAutopbn();
+        },
+        // 接管论坛原生自动翻页按钮：原生闭包内的 curpage/nextpageurl 是私有变量，脚本改不动；
+        // 脚本 AJAX 追加后闭包仍停在旧页，再点会抓已加载页被 tid 去重挡住，表现为「点了没反应」。
+        // 这里把按钮点击改走脚本自己的翻页基准，不再触发原生 getnextpagecontent()。
+        _adoptAutopbn() {
+            if (!isForumListPage()) return;
+            const ab = document.querySelector('#autopbn');
+            if (!ab) return;
+            ab.onclick = () => {
+                if (this._busy) return;
+                const href = this._nextHref();
+                if (href) this._loadNext(href);
+                else Util.toast('已是最后一页', 1500, 'fanye');
+            };
+        },
+        // 版块列表追加成功后，把地址栏与原生按钮属性对齐到新页（可见层一致）。
+        // replaceState 就地替换，不往后退历史里塞条目；闭包内部变量改不动，已由 _adoptAutopbn 接管点击绕开。
+        _syncAfterAppend(targetPage) {
+            if (!isForumListPage() || !targetPage) return;
+            try {
+                const u = new URL(location.href);
+                u.searchParams.set('page', String(targetPage));
+                history.replaceState(null, '', u.toString());
+            } catch (e) {}
+            const ab = document.querySelector('#autopbn');
+            if (!ab) return;
+            ab.setAttribute('curpage', String(targetPage));
+            // rel 指向下一页：沿用当前地址派生，保留 filter/orderby/searchid 等参数，相对串形态与原生一致
+            try {
+                const next = new URL(location.href);
+                next.searchParams.set('page', String(targetPage + 1));
+                ab.setAttribute('rel', next.pathname.replace(/^\//, '') + next.search);
+            } catch (e) {}
         },
         isTargetPage() {
             return isForumListPage() || isSpaceFavPage() || isSearchResultPage() || isDarkroomPage() || isGuidePage() || isSpaceThreadPage() || isSpaceReplyPage();
@@ -3368,12 +3562,16 @@
                 }
 
                 // 带上 Referer：部分 Discuz 站开了防盗链/WAF，无 Referer 的请求会被直接拒绝
-                const html = await Util.httpGet(href, {
-                    'Referer': location.href,
-                    // 补齐浏览器导航请求常见的头，缺这些时部分 WAF 会直接回 503
-                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                    'Accept-Language': navigator.language || 'zh-CN,zh;q=0.9',
-                    'Upgrade-Insecure-Requests': '1'
+                // 走全局池（rank 1）：翻页是用户滚动触发的，优先级高于热度，但让位给当前帖
+                const html = await Util.httpGetQueued(href, {
+                    rank: 1,
+                    headers: {
+                        Referer: location.href,
+                        // 补齐浏览器导航请求常见的头，缺这些时部分 WAF 会直接回 503
+                        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                        'Accept-Language': navigator.language || 'zh-CN,zh;q=0.9',
+                        'Upgrade-Insecure-Requests': '1',
+                    },
                 });
                 const doc = Util.parseHtml(html);
                 // 只有「一个列表容器都没有」时才可能是限流页；正常页直接跳过，避免把页头公告误判成限流
@@ -3405,6 +3603,7 @@
                     this._failCount = 0;
                     this._currentPage = targetPage;
                     if (this._pageLabel) { this._pageLabel.textContent = `共 ${this._currentPage} 页`; this._pageLabel.style.display = ''; }
+                    this._syncAfterAppend(targetPage);
                     Util.toast(`已自动加载 ${appended} 个新帖到当前页`, 2000, 'fanye');
                     // 追加后联动：搜索页同步板块筛选（看图不自动扫，等用户点球）
                     Util.safeRun('翻页后重建过滤面板', () => {
@@ -4551,14 +4750,18 @@
                 <h4 class="mb-setting-h4">
                     <span><span class="icon">⚙️</span>通用设置</span>
                     <span class="mb-setting-h4-right">
-                        <span class="btn-help" title="重新查看快速上手引导（四个球的用法、已读标记、窄屏）">📖 使用帮助</span>
+                        <span class="btn-help" title="重新查看快速上手引导（四个球的用法、已读标记、宽版）">📖 使用帮助</span>
                         <span class="btn-about" title="查看脚本版本、仓库与使用指南地址">ℹ️ 关于</span>
                     </span>
                 </h4>
                 <div class="mb-setting-grid">
                     <div class="mb-setting-row">
-                        <label title="开启后把论坛版心压到 960（旧版宽度）。只作用于版块列表、导读、帖子、搜索页；首页、个人中心、勋章、排行榜保持论坛原样。只在论坛「窄」档生效，切到全屏档会自动放开；切换后建议刷新一次页面让分页等信息重新排布">窄屏模式${Date.now() <= new Date('2026-11-24T23:59:59+08:00').getTime() ? '<span class="mb-new-badge">新</span>' : ''}：</label>
-                        <input type="checkbox" class="set-narrow-enabled mb-setting-checkbox" ${Util.storage.get('mengbao.narrow.enabled', false) ? 'checked' : ''} style="cursor:pointer;" title="把论坛版心压到 960（旧版宽度），只作用于版块列表、导读、帖子、搜索页，且仅在窄档生效">
+                        <label title="论坛已把窄档版心从 1200 改成 960。勾选后按 1200 覆盖，还原论坛旧版宽度，全站生效；不勾选则跟随论坛当前的 960。论坛切到全屏自适应档时自动放开，不受本项影响">宽版模式：</label>
+                        <input type="checkbox" class="set-page-width mb-setting-checkbox" ${Number(Util.userStore.get('mengbao.page.width', 1200)) !== 960 ? 'checked' : ''} style="cursor:pointer;" title="勾选 = 版心 1200（还原论坛旧版宽度，全站生效）；不勾选 = 跟随论坛当前的 960 窄档">
+                    </div>
+                    <div class="mb-setting-row">
+                        <label title="在「我的帖子」和别人的主题列表里，给每行标题右侧显示该帖的热度和购买人数。热度不到显示门槛的帖子不显示；购买数只有标价出售的帖子才有。进页时会逐帖取一次数据，一页约几秒；60 秒内命中沿用旧值免请求，超期重新抓取，超过 24 小时的记录清理出本地缓存">帖子热度与已购：</label>
+                        <input type="checkbox" class="set-owner-meta mb-setting-checkbox" ${Util.userStore.get('mengbao.owner.metaEnabled', true) ? 'checked' : ''} style="cursor:pointer;" title="勾选 = 显示热度与已购（会逐帖请求详情页）；不勾选 = 完全不请求，也不显示">
                     </div>
                     <div class="mb-setting-row">
                         <label title="浏览过的帖子怎么标记：关闭 / 变灰并划线 / 只变灰不划线">已读帖子：</label>
@@ -4609,7 +4812,7 @@
     // ===================== 设置保存 =====================
     function saveSettings(container) {
         const sortBefore = !!(Util.storage.get('mengbao.sort.config', Cfg.def('mengbao.sort.config')) || {}).enabled;
-        const narrowBefore = !!Util.storage.get('mengbao.narrow.enabled', false);
+        const pageWidthBefore = Number(Util.userStore.get('mengbao.page.width', 1200));
         const sortEnabled = container.querySelector('.set-sort-enabled');
         if (sortEnabled) Util.storage.set('mengbao.sort.config', { enabled: sortEnabled.checked });
 
@@ -4620,11 +4823,22 @@
             Util.storage.set('mengbao.browse.enabled', mode !== 'off');
             Util.storage.set('mengbao.browse.strike', mode === 'strike');
         }
-        // 窄屏模式：立即切 class 与变量，不必等刷新
-        const narrowEl = container.querySelector('.set-narrow-enabled');
-        if (narrowEl) {
-            Util.storage.set('mengbao.narrow.enabled', narrowEl.checked);
-            applyNarrowMode(narrowEl.checked);
+        // 版心宽度：立即切 class 与变量，不必等刷新
+        const pageWidthEl = container.querySelector('.set-page-width');
+        if (pageWidthEl) {
+            const pw = pageWidthEl.checked ? 1200 : 960;
+            Util.userStore.set('mengbao.page.width', pw);
+            applyPageWidth(pw);
+        }
+        // 帖子热度与已购：关掉要当场摘掉已渲染的小字，重开则重新拉一遍（模块未就绪时静默跳过，刷新后仍会生效）
+        const ownerMetaEl = container.querySelector('.set-owner-meta');
+        if (ownerMetaEl) {
+            const on = !!ownerMetaEl.checked;
+            Util.userStore.set('mengbao.owner.metaEnabled', on);
+            try {
+                if (!on) document.querySelectorAll('.mb-owner-meta').forEach((n) => n.remove());
+                else if (typeof moduleOwnerMeta !== 'undefined' && moduleOwnerMeta.init) moduleOwnerMeta.init();
+            } catch (e) {}
         }
         const browseColor = container.querySelector('.set-browse-color');
         if (browseColor) Util.storage.set('mengbao.browse.color', Util.isValidColor(browseColor.value.trim()) ? browseColor.value.trim() : '#f0f0f0');
@@ -4652,46 +4866,34 @@
         applyRuntimeSettings();
         // 排序靠 URL 参数（filter=author&orderby=dateline）实现，前端改不了现有页面，只能刷新后重走
         const sortChanged = !!sortEnabled && sortEnabled.checked !== sortBefore;
-        // 窄屏是当场切 class + CSS 变量，保存就已经生效了，所以单独说明一句；
-        // 排序要刷新才生效，两项都改的时候只说窄屏，避免一句 toast 塞两条互相矛盾的时序
-        const narrowChanged = !!narrowEl && narrowEl.checked !== narrowBefore;
+        // 版心宽度是当场切 class + CSS 变量，保存就已经生效了，所以单独说明一句；
+        // 排序要刷新才生效，两项都改的时候只说版心，避免一句 toast 塞两条互相矛盾的时序
+        const pageWidthChanged = !!pageWidthEl && (pageWidthEl.checked ? 1200 : 960) !== pageWidthBefore;
         let savedTip = '设置已保存';
-        if (narrowChanged) {
-            savedTip += narrowEl.checked
-                ? '，窄屏模式已开启（版块列表、导读、帖子、搜索页' + (isNarrowEligible() ? '，当前页已生效' : '，当前页不适用') + '）'
-                : '，窄屏模式已关闭';
+        if (pageWidthChanged) {
+            savedTip += pageWidthEl.checked ? '，已开启宽版模式（版心 1200，全站生效）' : '，已关闭宽版模式（跟随论坛 960 窄档）';
         }
         else if (sortChanged) savedTip += '，按发帖时间排序会在刷新后生效';
         Util.toast(savedTip, 2200, 'success');
     }
 
-    // 窄屏只服务阅读类页面（白名单）：版块列表 pg_forumdisplay、导读 pg_guide（各子视图实测同 class）、
-    // 帖子 pg_viewthread，以及搜索页——搜索页的 body 实测没有 class，只能按路径认。
-    // 用白名单而不是"全站开、再列排除"，是因为论坛以后新增的页面默认就不会被压成 960。
-    function isNarrowEligible() {
-        if (location.pathname.indexOf('search.php') > -1) return true;
-        const cls = document.body ? String(document.body.className) : '';
-        return /pg_forumdisplay|pg_guide|pg_viewthread/.test(cls);
-    }
-
-    // 窄屏模式：给 html 挂 class 并覆盖 --mb-page-width；CSS 侧用 :not(.widthauto) 保证只在论坛窄档生效
-    function applyNarrowMode(on) {
+    // 版心宽度（窄档）：给 html 挂 class 并覆盖 --mb-page-width；CSS 侧用 :not(.widthauto) 保证只在论坛窄档生效。
+    // 两档语义：960 = 不开宽版（跟随论坛窄档，不挂 class）；1200 = 开宽版（还原论坛旧版版心，全站生效）。
+    // 全站生效：论坛现在整体是 960，只在阅读页放宽会变成「个别宽、整体窄」，所以不做页面白名单。
+    // 设定 960 等于跟随论坛默认，不挂 class，省掉一遍无意义的 !important 覆盖。
+    function applyPageWidth(v) {
         const d = document.documentElement;
-        if (!d) return;   // document-start 极端情况下 html 尚未建好
-        const active = !!on && isNarrowEligible();
-        d.classList.toggle('mb-narrow-mode', active);
-        d.style.setProperty('--mb-page-width', active ? '960px' : '1200px');
+        if (!d) return; // document-start 极端情况下 html 尚未建好
+        const n = Number(v);
+        const px = n === 960 ? 960 : 1200;   // 旧存储里若残留 1400 等脏值，一律按开宽版（1200）处理
+        d.style.setProperty('--mb-page-width', px + 'px');
+        d.classList.toggle('mb-page-width', px !== 960);
     }
-    // 启动即应用一次，否则装了脚本要等进设置保存才生效。
-    // 判断依赖 body.class，document-start 时 body 还没建好，所以推迟到 DOM 就绪再判。
-    (function bootNarrowMode() {
+    // 启动即应用一次。这里不等 DOMContentLoaded：不依赖 body.class 了，
+    // 越早挂 class 越好，否则论坛先按 960 排一遍、class 后挂上，首屏会出现导航条与内容错位的那一下。
+    (function bootPageWidth() {
         try {
-            const on = Util.storage.get('mengbao.narrow.enabled', false);
-            if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', function () { applyNarrowMode(on); }, { once: true });
-            } else {
-                applyNarrowMode(on);
-            }
+            applyPageWidth(Util.userStore.get('mengbao.page.width', 1200));
         } catch (e) {}
     })();
 
@@ -6185,9 +6387,500 @@
     window.addEventListener('load', () => syncAnchorOffset());
     window.addEventListener('resize', () => syncAnchorOffset());
 
+    // ===================== 模块六：发帖人热度与已购（「我的帖子」/ 个人主题页） =====================
+    // ===================== 发帖人热度与已购（「我的帖子」/ 个人主题页） =====================
+    // 这两个页面自身只有 主题 / 版块 / 作者 / 回复查看 / 最后发帖，既没有热度也没有购买数，
+    // 两个值只能从帖子详情页取；详情页取不到时用 Discuz 原生购买记录浮层接口兜底补「已购」。
+    // 热度元素不存在是常态——热度未达 Discuz 显示门槛时服务端整块不输出，与付费墙无关，不当失败重试。
+    const moduleOwnerMeta = {
+        MAX_CONC: 4, // 一页约 30 帖；并发 4 约 3 秒跑完，再高容易被站方限流
+        GAP_MS: 150,
+        // 缓存改成软兜底：60 秒内命中才直接画旧值并免请求；超过就照抓，新值到位直接替换，
+        // 不再出现「24 小时内只画旧值、热度永远不更新」
+        SOFT_TTL: 60 * 1000,
+        PURGE_TTL: 24 * 60 * 60 * 1000, // 落盘清理：24 小时以上彻底删除，避免缓存无限膨胀
+        REQ_TIMEOUT: 6000, // 详情页单请求超时：超时即走购买记录兜底，不让一个慢请求拖住整行
+        BK_CONC: 2, // 兜底请求独立并发槽：不排在几十个详情页请求后面
+        _bk: { active: 0, queue: [] },
+        queue: [],
+        active: 0,
+        pending: {}, // 已入队未落地的 tid，避免重复 init 时同一个帖子被请求两次
+        _data: null,
+        _dirty: false,
+        _flushTimer: null,
+        isTargetPage() {
+            // 排行榜页的热度随排行榜筛选一起留到 1.8，这里只认「我的帖子」与个人主题页
+            return isSpaceThreadPage();
+        },
+        data() {
+            if (this._data) return this._data;
+            const raw = Util.storage.get('mengbao.owner.meta', null);
+            this._data = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+            return this._data;
+        },
+        // 只返回「够新」的缓存：60 秒内才允许直接画并免掉请求；更旧的仍然保留在盘上，
+        // 但要让位给一次真实请求，保证热度/已购能跟上变化
+        cacheGet(tid) {
+            const rec = this.data()[tid];
+            if (!rec || typeof rec !== 'object') return null;
+            if (Date.now() - (rec.ts || 0) > this.SOFT_TTL) return null;
+            return rec;
+        },
+        cacheSet(tid, meta) {
+            this.data()[tid] = Object.assign({}, meta, { ts: Date.now() });
+            this._dirty = true;
+            if (this._flushTimer) return;
+            this._flushTimer = setTimeout(() => {
+                this._flushTimer = null;
+                this.flushNow();
+            }, 800);
+        },
+        // 合并字段：新值优先；本次为空的字段用旧记录补，已有值不被空值覆盖。
+        mergeMeta(base, extra) {
+            const out = Object.assign({}, base);
+            if (extra) {
+                ['heat', 'buy', 'price'].forEach((k) => {
+                    if (extra[k] != null) out[k] = extra[k];
+                });
+            }
+            return out;
+        },
+        // 立即落盘：详情页被动回写要赶在点返回之前写完，不等 800ms 合并延迟
+        flushNow() {
+            if (this._flushTimer) {
+                clearTimeout(this._flushTimer);
+                this._flushTimer = null;
+            }
+            if (!this._dirty) return;
+            this._dirty = false;
+            const c = this.data();
+            const now = Date.now();
+            Object.keys(c).forEach((k) => {
+                if (now - (c[k].ts || 0) > this.PURGE_TTL) delete c[k];
+            });
+            try {
+                Util.storage.set('mengbao.owner.meta', c);
+            } catch (e) {}
+        },
+        // ---- 解析：热度三形态（值都在 title 上）----
+        parseMeta(html) {
+            const out = { heat: null, buy: null, price: null };
+            if (!html) return out;
+            let m = html.match(/title="热度[：:]\s*(\d+)"/);
+            if (m) out.heat = Number(m[1]);
+            if (out.heat == null) {
+                // 兜底：title 是纯数字，但元素本身有热度标识，避免把页面上任意 img 的 title 误当热度
+                m =
+                    html.match(/<(?:img|span)[^>]*(?:alt="heatlevel"|hot_\d+\.gif)[^>]*title="(\d+)"/i) ||
+                    html.match(/<(?:img|span)[^>]*title="(\d+)"[^>]*(?:alt="heatlevel"|hot_\d+\.gif)/i);
+                if (m) out.heat = Number(m[1]);
+            }
+            const mBuy = html.match(/已有\s*(\d+)\s*人购买/);
+            if (mBuy) out.buy = Number(mBuy[1]);
+            const mPrice = html.match(/需向作者支付\s*(\d+)\s*金钱/) || html.match(/(\d+)\s*金钱\s*才能浏览/);
+            if (mPrice) out.price = Number(mPrice[1]);
+            // 有售价却没有「已有 N 人购买」文案 = 0 人买的售卖帖（服务端对 0 购买只输出售价）。
+            // 免费帖没有售价，不会被误判成「已购 0」
+            if (out.buy == null && out.price != null) out.buy = 0;
+            return out;
+        },
+        // ---- 解析：购买记录浮层 ----
+        // 表格里除 thead 表头外还有空占位行 <tr><td colspan="3"></td></tr>，
+        // 所以不能按「tr 数 − 1」算，否则免费帖会被算成 1 人购买；只数带链接的真实记录行。
+        parseBuyCount(text) {
+            if (!text || /alert_error/.test(text)) return null;
+            try {
+                const xml = new DOMParser().parseFromString(text, 'text/xml');
+                const root = xml.querySelector('root');
+                const inner = root ? root.textContent : text;
+                const doc = new DOMParser().parseFromString(inner, 'text/html');
+                const table = doc.querySelector('table.list');
+                if (!table) return null;
+                const rows = [].slice.call(table.querySelectorAll('tr')).filter((tr) => !tr.closest('thead'));
+                return rows.filter((tr) => tr.querySelector('a')).length;
+            } catch (e) {
+                return null;
+            }
+        },
+        buyCountUrl(tid) {
+            return (
+                location.origin +
+                '/forum.php?mod=misc&action=viewpayments&tid=' +
+                tid +
+                '&infloat=yes&handlekey=pay&inajax=1&ajaxtarget=fwin_content_pay'
+            );
+        },
+        // ---- 请求队列（并发 4 / 间隔 150ms）----
+        pump() {
+            while (this.active < this.MAX_CONC && this.queue.length) {
+                const task = this.queue.shift();
+                this.active++;
+                let settled = false;
+                const done = (result) => {
+                    if (settled) return;
+                    settled = true;
+                    this.active--;
+                    try {
+                        task.cb(result);
+                    } catch (e) {}
+                    setTimeout(() => this.pump(), this.GAP_MS);
+                };
+                // 走全局池（rank 2）：热度不着急，让位给当前帖与翻页；同一页 HTML 若已被看图抓过，直接复用
+                // 单请求 6 秒封顶：超时按失败处理，早点走购买记录兜底，不被一个慢页面拖住整行
+                const req = Util.httpGetQueued(task.url, { rank: 2 });
+                const guard = new Promise((resolve) => {
+                    const t = setTimeout(() => resolve(null), this.REQ_TIMEOUT);
+                    req.then(
+                        () => clearTimeout(t),
+                        () => clearTimeout(t)
+                    );
+                });
+                Promise.race([req, guard])
+                    .then((txt) => {
+                        let r = null;
+                        if (txt) {
+                            try {
+                                r = task.parse(txt);
+                            } catch (e) {
+                                r = null;
+                            }
+                        }
+                        done(r);
+                    })
+                    .catch(() => done(null));
+            }
+        },
+        enqueue(task) {
+            this.queue.push(task);
+            this.pump();
+        },
+        // 兜底（购买记录接口）走自己的并发槽：详情页队列里可能排着几十个请求，
+        // 兜底再排在后面，「已购」就会比「热度」晚很多才出现
+        enqueueBackup(task) {
+            this._bk.queue.push(task);
+            this.pumpBackup();
+        },
+        pumpBackup() {
+            const bk = this._bk;
+            while (bk.active < this.BK_CONC && bk.queue.length) {
+                const task = bk.queue.shift();
+                bk.active++;
+                let settled = false;
+                const done = (result) => {
+                    if (settled) return;
+                    settled = true;
+                    bk.active--;
+                    try {
+                        task.cb(result);
+                    } catch (e) {}
+                    setTimeout(() => this.pumpBackup(), this.GAP_MS);
+                };
+                const req = Util.httpGetQueued(task.url, { rank: 1 });
+                const guard = new Promise((resolve) => {
+                    const t = setTimeout(() => resolve(null), this.REQ_TIMEOUT);
+                    req.then(
+                        () => clearTimeout(t),
+                        () => clearTimeout(t)
+                    );
+                });
+                Promise.race([req, guard])
+                    .then((txt) => {
+                        let r = null;
+                        if (txt) {
+                            try {
+                                r = task.parse(txt);
+                            } catch (e) {
+                                r = null;
+                            }
+                        }
+                        done(r);
+                    })
+                    .catch(() => done(null));
+            }
+        },
+        // ---- 渲染 ----
+        // 标题在 <th> 内（<a>标题</a> <i>图片图标</i> <span class="tps">页数</span>，全是 inline），
+        // 追加到 th 末尾即落在标题同一行右侧；td.icn 里也有指向同一 tid 的图标链接，不能拿它当锚点。
+        titleCell(row) {
+            const th = row.querySelector('th');
+            if (th) return th;
+            // 少数皮肤/榜单模板标题不在 th 里：回退到锚点所在的 td 或父节点
+            const a = this.titleAnchor(row);
+            return a ? a.closest('td') || a.parentNode : null;
+        },
+        titleAnchor(row) {
+            const th = row.querySelector('th');
+            if (th) {
+                return (
+                    th.querySelector('a[href*="viewthread"], a[href*="tid="], a[href*="thread-"]') || th.querySelector('a')
+                );
+            }
+            return row.querySelector('a[href*="viewthread"], a[href*="tid="], a[href*="thread-"]');
+        },
+        extractTid(href) {
+            if (!href) return null;
+            const m = href.match(/tid=(\d+)/) || href.match(/thread-(\d+)/);
+            return m ? m[1] : null;
+        },
+        buildText(meta) {
+            if (!meta) return '';
+            const parts = [];
+            if (meta.heat != null) parts.push('热度 ' + meta.heat);
+            // 售价只取不显示，仅用来判定售卖帖——它是区分「0 人买的售卖帖」和「免费帖」的唯一依据
+            const showBuy = meta.buy != null && (meta.price != null || meta.buy > 0);
+            if (showBuy) parts.push('已购 ' + meta.buy);
+            return parts.join(' · ');
+        },
+        render(row, meta) {
+            const cell = this.titleCell(row);
+            if (!cell) return;
+            [].slice.call(row.querySelectorAll('.mb-owner-meta')).forEach((n) => {
+                if (n.parentNode !== cell) n.remove();
+            });
+            const text = this.buildText(meta);
+            let span = cell.querySelector('.mb-owner-meta');
+            // 无热度也无已购时整块不渲染，连「热度-」也不留
+            if (!text) {
+                if (span) span.remove();
+                return;
+            }
+            if (!span) {
+                span = document.createElement('span');
+                span.className = 'mb-owner-meta';
+                cell.appendChild(span);
+            }
+            span.textContent = text;
+        },
+        // 详情页读真实值：回写缓存与标题行渲染共用同一份解析
+        readThreadMeta() {
+            const meta = { heat: null, buy: null, price: null };
+            try {
+                // 热度：先选真实热度元素，取不到再整页文本兜底
+                const heatEl =
+                    document.querySelector('[title^="热度"]') ||
+                    document.querySelector('.theatlevel') ||
+                    document.querySelector('img[alt="heatlevel"]');
+                if (heatEl) {
+                    const hm = (heatEl.getAttribute('title') || '').match(/(\d+)/);
+                    if (hm) meta.heat = Number(hm[1]);
+                }
+                // 已购：先选购买容器，取不到再整页文本兜底
+                const buyEl = document.querySelector('#p_t .right, em.right, .plc .right');
+                if (buyEl) {
+                    const bm = (buyEl.textContent || '').match(/已有\s*(\d+)\s*人购买/);
+                    if (bm) meta.buy = Number(bm[1]);
+                }
+                if (meta.buy == null) {
+                    const bm = (document.body.textContent || '').match(/已有\s*(\d+)\s*人购买/);
+                    if (bm) meta.buy = Number(bm[1]);
+                }
+                if (meta.price == null) {
+                    const pm =
+                        (document.body.textContent || '').match(/需向作者支付\s*(\d+)\s*金钱/) ||
+                        (document.body.textContent || '').match(/(\d+)\s*金钱\s*才能浏览/);
+                    if (pm) meta.price = Number(pm[1]);
+                }
+            } catch (e) {}
+            // 有售价、却没有购买文案 = 0 人买的售卖帖；免费帖无售价，不会被误判
+            if (meta.buy == null && meta.price != null) meta.buy = 0;
+            return meta;
+        },
+        // 详情页标题行：站点原生火焰（span.tbox.theatlevel）后面直接补数字。
+        // 实测 tid=3873841：火焰在 h1 之外、紧邻 #thread_subject，只有悬浮才看得到数字。
+        renderThreadHeader(meta) {
+            const text = this.buildText(meta);
+            const old = document.querySelector('.mb-owner-meta[data-mb-thread="1"]');
+            if (!text) {
+                if (old) old.remove();
+                return;
+            }
+            if (old) {
+                old.textContent = text;
+                return;
+            }
+            // 专版已经画了同一处，避免标题行出两份数字
+            if (document.querySelector('.mbo-owner-meta[data-mbo-thread="1"]')) return;
+            const heatEl =
+                document.querySelector('[title^="热度"]') ||
+                document.querySelector('.theatlevel') ||
+                document.querySelector('img[alt="heatlevel"]');
+            const subject = document.getElementById('thread_subject');
+            if (!heatEl && !subject) return;
+            const span = document.createElement('span');
+            span.className = 'mb-owner-meta mb-thread-meta';
+            span.setAttribute('data-mb-thread', '1');
+            span.textContent = text;
+            if (heatEl) heatEl.insertAdjacentElement('afterend', span);
+            else subject.insertAdjacentElement('afterend', span);
+        },
+        collectRows() {
+            // 表头行有 .th、看图球插的预览行没有 th，都能被 titleAnchor 过滤掉
+            return [].slice.call(document.querySelectorAll('#ct .tl tbody tr, #ct table.tl tbody tr')).filter((row) => {
+                if (row.classList.contains('th')) return false;
+                return !!this.titleAnchor(row);
+            });
+        },
+        startRow(row) {
+            const anchor = this.titleAnchor(row);
+            if (!anchor) return;
+            const tid = this.extractTid(anchor.getAttribute('href'));
+            if (!tid) return;
+            if (row.dataset.mbOwnerTid === tid && row.querySelector('.mb-owner-meta')) return;
+            row.dataset.mbOwnerTid = tid;
+            if (this.pending[tid]) return;
+            const cached = this.cacheGet(tid);
+            if (cached) {
+                this.render(row, cached);
+                return;
+            }
+            this.pending[tid] = 1;
+            this.enqueue({
+                url: anchor.href,
+                parse: (html) => this.parseMeta(html),
+                retried: false,
+                cb: (meta) => this.onMeta(row, tid, anchor.href, meta, false),
+            });
+        },
+
+        // 详情页回调：合并新值与盘上旧记录 → 必要时重试一次 → 已购缺失走购买记录接口
+        onMeta(row, tid, url, meta, retried) {
+            const soft = this.data()[tid] || null;
+            const got = meta && (meta.heat != null || meta.buy != null || meta.price != null);
+
+            // parseMeta 内部已判「有售价无购买文案 = 已购 0」，此处不重复判定
+            // 详情页新值优先，缺项用盘上旧记录补；空值不覆盖已有值
+            const merged = this.mergeMeta(soft, meta);
+
+            if (merged.heat != null || merged.buy != null || merged.price != null) {
+                this.cacheSet(tid, merged);
+                this.render(row, merged);
+            } else if (soft) {
+                this.render(row, soft);
+            }
+
+            // 重试一次：详情页全空，或部分成功但热度缺失；每帖只重试一次。
+            // 已购缺失不靠重抓详情页（走购买记录接口）；热度没有第二接口，重试后仍缺则留空。
+            if (!retried && (!got || meta.heat == null)) {
+                this.enqueue({
+                    url: url,
+                    parse: (html) => this.parseMeta(html),
+                    retried: true,
+                    cb: (m2) => this.onMeta(row, tid, url, m2, true),
+                });
+                return;
+            }
+
+            delete this.pending[tid];
+
+            // 已购仍缺：走购买记录接口补「已购」；保留当前热度/售价。
+            // 0 条记录表示没有购买记录，不能当成「已购 0」——免费帖会因此错标；兜底结果不入缓存。
+            if (merged.buy == null) {
+                this.enqueueBackup({
+                    url: this.buyCountUrl(tid),
+                    parse: (txt) => this.parseBuyCount(txt),
+                    cb: (n) => {
+                        if (n == null || n <= 0) return;
+                        this.render(row, { heat: merged.heat, buy: n, price: merged.price });
+                    },
+                });
+            }
+        },
+        // 详情页被动回写：进帖子页时读页面上的真实热度/已购，立刻写回缓存，列表页下次直接命中
+        writeBackFromThread() {
+            if (!isThreadPage()) return;
+            if (!document.body) return;
+            // 开关关掉即彻底不读：本页 DOM 也不解析、不写缓存、不补读
+            if (!Util.userStore.get('mengbao.owner.metaEnabled', true)) return;
+            try {
+                const m = location.href.match(/[?&]tid=(\d+)/) || location.href.match(/thread-(\d+)/);
+                const tid = m ? m[1] : '';
+                if (!tid) return;
+                let meta = this.readThreadMeta();
+                // 开关关掉只回写缓存、不画标签，与列表页的处理保持一致
+                if (Util.userStore.get('mengbao.owner.metaEnabled', true)) this.renderThreadHeader(meta);
+                if (meta.heat == null && meta.buy == null && meta.price == null) return;
+                this.cacheSet(tid, meta);
+                this.flushNow(); // 立即落盘，赶在点返回之前
+                // 首帖/购买文案可能晚于脚本就绪：已购缺失时补读一次，只补不覆盖
+                if (meta.buy == null) {
+                    setTimeout(() => {
+                        try {
+                            if (!isThreadPage() || !document.body) return;
+                            const again = this.readThreadMeta();
+                            if (again.buy == null && again.price == null) return;
+                            meta = this.mergeMeta(meta, again);
+                            if (Util.userStore.get('mengbao.owner.metaEnabled', true)) this.renderThreadHeader(meta);
+                            this.cacheSet(tid, meta);
+                            this.flushNow();
+                        } catch (e) {}
+                    }, 1500);
+                }
+            } catch (e) {}
+        },
+        // 可见优先：长列表一次可能上百行，先跑视口上下各一屏，首屏落地后再按批补剩余，
+        // 不监听滚动（滚到哪都已经是现成的），避免首屏被上百个请求挤到队尾
+        startVisibleFirst(rows) {
+            if (rows.length < 20) {
+                rows.forEach((row) => this.startRow(row));
+                return;
+            }
+            const vh = window.innerHeight || 800;
+            const near = [];
+            const rest = [];
+            rows.forEach((row) => {
+                let top = 0;
+                try {
+                    top = row.getBoundingClientRect().top;
+                } catch (e) {}
+                if (top < vh * 2) near.push(row);
+                else rest.push(row);
+            });
+            near.forEach((row) => this.startRow(row));
+            if (!rest.length) return;
+            let i = 0;
+            const timer = setInterval(() => {
+                if (!rest.length || i >= rest.length) {
+                    clearInterval(timer);
+                    return;
+                }
+                const batch = rest.slice(i, i + 20);
+                i += batch.length;
+                batch.forEach((row) => this.startRow(row));
+            }, 1200);
+        },
+        init() {
+            this.writeBackFromThread();
+            try {
+                if (!Util.userStore.get('mengbao.owner.metaEnabled', true)) return;
+                if (!this.isTargetPage()) return;
+                const rows = this.collectRows();
+                if (rows.length) {
+                    this.startVisibleFirst(rows);
+                    return;
+                }
+                // 页面可能还在渲染：短暂轮询等列表出现
+                let tries = 0;
+                const timer = setInterval(() => {
+                    const r2 = this.collectRows();
+                    if (r2.length || ++tries > 60) {
+                        clearInterval(timer);
+                        if (r2.length) this.startVisibleFirst(r2);
+                    }
+                }, 300);
+            } catch (e) {
+                Util.log('error', '热度模块初始化失败：', e);
+            }
+        },
+    };
+
+
+
     // ===================== 主入口 =====================
     function main() {
         injectStyle();
+        try {
+            applyPageWidth(Util.userStore.get('mengbao.page.width', 1200));
+        } catch (e) {}
         syncAnchorOffset();
         moduleSortByDateline();
         GM_registerMenuCommand('设置（v' + MB_VERSION + '）', openGmSettingDialog);
@@ -6279,7 +6972,7 @@
                 + '<div class="mb-guide-row">🖼️ 看图球：左键开启图片预览 ｜ 右键停止加载并收起（缓存保留）</div>'
                 + '<div class="mb-guide-row">⚡ 增强球：左键功能面板（画廊/收藏/评分…）｜ 右键评论面板</div>'
                 + '<div class="mb-guide-row">🎨 蓝底行 = 你收藏的用户发帖 ｜ 变色行 = 你已读过的帖（底色与划线可在设置里调）</div>'
-                + '<div class="mb-guide-row">🖥️ 窄屏模式：想把论坛版心压回 3.4 时代的 960 宽，去设置里勾「窄屏模式」（默认关闭）</div>'
+                + '<div class="mb-guide-row">🖥️ 宽版模式：论坛把窄档版心压到了 960，想把版心还原成论坛旧版的 1200 宽，去设置里勾「宽版模式」（默认开启）；论坛全屏档不受影响</div>'
                 + '<div class="mb-guide-hint">提示：所有球都可拖动，拖到屏幕边缘会自动校正位置</div>'
                 + '<button type="button" class="mb-guide-ok">知道了</button>';
             const ok = card.querySelector('.mb-guide-ok');
@@ -6311,6 +7004,13 @@
         // 依赖顺序：搜索 -> 看图（看图依赖搜索的 isTidHidden）-> 翻页 -> 增强 -> 设置页 -> 收藏按钮
         // 错误统一由外层 Util.safeRun 记录（含日志与提示），模块内不再各自 console.error
         try { Util.userStore.migrateAllOnce(); } catch (e) { Util.log('error', '用户数据迁移失败：', e); }
+        // 迁移后重新按当前账号套一次运行时 CSS 变量，避免首次解析成 guest 时首屏颜色与版心不跟账号
+        try {
+            applyPageWidth(Util.userStore.get('mengbao.page.width', 1200));
+            applyRuntimeSettings();
+        } catch (e) {
+            Util.log('error', '运行时设置应用失败：', e);
+        }
         // 已读标记只靠页面初始化跑一次，切标签页/切窗口回来都不会补标，这里给一个统一的重新标记入口
         const refreshBrowsedMark = () => {
             try {
@@ -6324,6 +7024,10 @@
             ['自动翻页', () => { if (modulePager.isTargetPage()) modulePager.init(); }],
             ['增强模块', () => { if (moduleZengqiang.isTargetPage()) moduleZengqiang.init(); }],
             ['收藏用户按钮', () => initFavUserButtons()],
+            ['发帖人热度', () => {
+                if (moduleOwnerMeta.isTargetPage()) moduleOwnerMeta.init();
+                else if (isThreadPage()) moduleOwnerMeta.writeBackFromThread();
+            }],
             ['浏览历史', () => {
                 if (isThreadPage()) {
                     // 开关关闭时完全不记账（设置「已读帖子」选「关闭」）
