@@ -2,1007 +2,338 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>萌宝小秘书 使用指南 v1.6</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0f6b6d">
+<meta name="description" content="萌宝小秘书 v1.7 使用指南：安装、页面支持、四个悬浮球、看图翻页过滤、详情增强、收藏馆、设置、多账号与全量配置导入导出。">
+<title>萌宝小秘书 · 使用指南 v1.7</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230f6b6d'/%3E%3Cpath d='M17 43V21h7l8 11 8-11h7v22h-7V31l-8 10-8-10v12z' fill='white'/%3E%3C/svg%3E">
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  :root {
-    --accent: #4096ff;
-    --accent-soft: #eef4ff;
-    --accent-deep: #1d6fd1;
-    --accent-line: #d6e4ff;
-    --amber: #f9a825;
-    --amber-soft: #fff8e1;
-    --sky: #0284c7;
-    --sky-soft: #e0f2fe;
-    --purple: #9333ea;
-    --purple-soft: #f3e8ff;
-    --green: #16a34a;
-    --green-soft: #e8f8ee;
-    --blue: #2563eb;
-    --blue-soft: #e8f1ff;
-    --neutral-soft: #f8fafc;
-    --danger: #dc2626;
-    --text: #1f2329;
-    --text-muted: #646a73;
-    --text-hint: #8f959e;
-    --bg: #fff;
-    --bg-secondary: #f5f7fa;
-    --border: #e5e7eb;
-    --radius: 12px;
-  }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
-    color: var(--text);
-    background: var(--bg-secondary);
-    line-height: 1.6;
-  }
-  /* ===== Hero ===== */
-  .hero {
-    background: linear-gradient(135deg, #4096ff 0%, #1d6fd1 100%);
-    color: #fff;
-    padding: 56px 24px 72px;
-    text-align: center;
-  }
-  .hero-title { display: inline-flex; align-items: baseline; gap: 12px; }
-  .hero h1 { font-size: 32px; font-weight: 700; margin: 0; letter-spacing: 1px; }
-  .hero .version {
-    display: inline-block;
-    background: rgba(255,255,255,0.2);
-    padding: 4px 14px;
-    border-radius: 20px;
-    font-size: 13px;
-  }
-  .hero .tagline { font-size: 16px; opacity: 0.92; max-width: 560px; margin: 0 auto; line-height: 1.7; }
-  /* ===== 容器 ===== */
-  .container { max-width: 1120px; margin: -36px auto 60px; padding: 0 20px; }
-  /* ===== 亮点卡片 ===== */
-  .highlights { display: grid; grid-template-columns: 1fr; gap: 14px; margin-bottom: 44px; }
-  .highlight-card {
-    background: var(--bg); border-radius: var(--radius); padding: 22px;
-    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
-  }
-  .highlight-card .icon-wrap {
-    width: 42px; height: 42px; border-radius: 10px; background: var(--accent-soft);
-    display: flex; align-items: center; justify-content: center; margin-bottom: 12px;
-  }
-  .highlight-card h3 { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
-  .highlight-card p { font-size: 13px; color: var(--text-muted); line-height: 1.6; }
-  /* ===== 板块标题 ===== */
-  .section-title {
-    font-size: 20px; font-weight: 700; margin-bottom: 12px; padding-bottom: 10px;
-    border-bottom: 2px solid var(--accent); display: inline-block;
-  }
-  .section-intro { font-size: 13.5px; color: var(--text-muted); line-height: 1.75; margin-bottom: 20px; }
-  .feature-section { margin-bottom: 44px; }
-  /* ===== 功能板块 ===== */
-  .feature-grid { display: grid; grid-template-columns: 1fr; gap: 14px; }
-  .feature-item {
-    background: var(--bg); border-radius: var(--radius); padding: 18px 20px;
-    box-shadow: 0 1px 6px rgba(0,0,0,0.04); border-left: 3px solid var(--accent);
-  }
-  .feature-item h4 {
-    font-size: 14.5px; font-weight: 600; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;
-  }
-  .feature-item h4 .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
-  .feature-item p { font-size: 13px; color: var(--text-muted); line-height: 1.65; margin-bottom: 6px; }
-  .feature-item ul { list-style: none; margin-top: 6px; }
-  .feature-item li {
-    font-size: 12.5px; color: var(--text-muted); padding: 3px 0 3px 14px; position: relative;
-  }
-  .feature-item li::before {
-    content: "·"; position: absolute; left: 4px; color: var(--text-hint); font-weight: bold;
-  }
-  /* ===== 悬浮球详解 ===== */
-  .fab-guide { background: var(--bg); border-radius: var(--radius); padding: 8px 24px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
-  .fab-item { display: flex; gap: 18px; align-items: flex-start; padding: 20px 0; border-bottom: 1px solid var(--border); }
-  .fab-item:last-child { border-bottom: none; }
-  .fab-demo {
-    width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
-    font-size: 21px; flex-shrink: 0; box-shadow: 0 2px 8px rgba(0,0,0,0.12); border: 1px solid rgba(0,0,0,0.06);
-  }
-  /* 四球配色取自脚本实际值：看图 #bfdbfe、翻页 #ddd6fe、过滤 #bbf7d0、增强 #f8fafc（近白），
-     边框深浅也与脚本一致，演示球和实机上看到的是同一档颜色 */
-  .fab-demo-guolv     { background:#bbf7d0; border-color:rgba(34,197,94,0.30); color:#16a34a; }
-  .fab-demo-zengqiang { background:#f8fafc; border-color:rgba(100,116,139,0.22); color:#475569; }
-  .fab-demo-kantu     { background:#bfdbfe; border-color:rgba(59,130,246,0.30); color:#2563eb; }
-  .fab-demo-pager     { background:#ddd6fe; border-color:rgba(139,92,246,0.30); color:#8b5cf6; }
-  .fab-info { flex: 1; }
-  .fab-info h5 { font-size: 14.5px; font-weight: 600; margin-bottom: 6px; }
-  .fab-info p { font-size: 12.5px; color: var(--text-muted); line-height: 1.65; margin-bottom: 3px; }
-  .fab-where { font-size: 12px; color: var(--text-hint); margin: 6px 0 8px; }
-  .fab-where b { color: var(--text-muted); font-weight: 600; }
-  .status-row { display: flex; flex-wrap: wrap; gap: 6px; }
-  .status {
-    display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11.5px; line-height: 1.5;
-  }
-  .status-idle-amber { background: var(--amber-soft); color: #a16700; }
-  .status-on-amber   { background: var(--amber); color: #fff; }
-  .status-off-gray   { background: #e5e7eb; color: #4b5563; }
-  .status-idle-sky   { background: var(--sky-soft); color: #0369a1; }
-  .status-on-sky     { background: var(--sky); color: #fff; }
-  .status-idle-blue     { background: var(--blue-soft); color: #1e40af; }
-  .status-on-blue       { background: var(--blue); color: #fff; }
-  .status-idle-purple   { background: var(--purple-soft); color: #6b21a8; }
-  .status-on-purple     { background: var(--purple); color: #fff; }
-  .status-idle-green    { background: var(--green-soft); color: #15803d; }
-  .status-idle-neutral  { background: var(--neutral-soft); color: #475569; }
-  /* ===== 设置详解 ===== */
-  .setting-block {
-    background: var(--bg); border-radius: var(--radius); padding: 20px 24px;
-    box-shadow: 0 1px 6px rgba(0,0,0,0.04); margin-bottom: 14px;
-  }
-  .setting-block h4 { font-size: 14.5px; font-weight: 600; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
-  .setting-block h4 .ico { font-size: 15px; }
-  .setting-list { display: flex; flex-direction: column; gap: 10px; }
-  .setting-row { display: flex; gap: 12px; align-items: baseline; }
-  .setting-row .name { font-size: 13px; font-weight: 600; color: var(--text); min-width: 118px; flex-shrink: 0; }
-  .setting-row .desc { font-size: 12.5px; color: var(--text-muted); line-height: 1.65; }
-  .setting-row .default { font-size: 11.5px; color: var(--text-hint); white-space: nowrap; }
-  .btn-grid { display: grid; grid-template-columns: 1fr; gap: 10px; margin-top: 4px; }
-  .btn-card {
-    background: var(--bg-secondary); border-radius: 8px; padding: 12px 14px;
-    font-size: 12.5px; line-height: 1.6;
-  }
-  .btn-card b { display: block; font-size: 13px; color: var(--accent-deep); margin-bottom: 4px; }
-  .btn-card span { color: var(--text-muted); font-size: 12px; }
-  /* ===== 快速上手 ===== */
-  .steps { background: var(--bg); border-radius: var(--radius); padding: 26px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
-  .step-list { display: flex; flex-direction: column; gap: 18px; }
-  .step { display: flex; gap: 14px; align-items: flex-start; }
-  .step-num {
-    width: 30px; height: 30px; border-radius: 50%; background: var(--accent); color: #fff;
-    display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; flex-shrink: 0;
-  }
-  .step-content h5 { font-size: 14.5px; font-weight: 600; margin-bottom: 4px; }
-  .step-content p { font-size: 13px; color: var(--text-muted); line-height: 1.65; }
-  /* ===== 界面入口 ===== */
-  .ui-guide { background: var(--bg); border-radius: var(--radius); padding: 26px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
-  .ui-grid { display: grid; grid-template-columns: 1fr; gap: 14px; }
-  .ui-item { padding: 14px; background: var(--bg-secondary); border-radius: 8px; }
-  .ui-item h5 { font-size: 13.5px; font-weight: 600; margin-bottom: 5px; color: var(--accent-deep); }
-  .ui-item p { font-size: 12.5px; color: var(--text-muted); line-height: 1.65; }
-  /* ===== 提示块 ===== */
-  .tip {
-    background: var(--accent-soft); border-left: 3px solid var(--accent);
-    border-radius: 8px; padding: 12px 16px; font-size: 12.5px; color: var(--text-muted); line-height: 1.7;
-    margin-bottom: 16px;
-  }
-  .tip b { color: var(--accent-deep); }
-  /* ===== 底部 ===== */
-  .footer { text-align: center; padding: 20px; color: var(--text-hint); font-size: 12.5px; line-height: 1.8; }
-  /* ===== 版本变化卡片 ===== */
-  .intro-text { font-size: 13.5px; color: var(--text-muted); line-height: 1.75; margin-bottom: 20px; }
-  .card { background: var(--bg); border-radius: var(--radius); padding: 20px 24px; box-shadow: 0 1px 6px rgba(0,0,0,0.04); margin-bottom: 14px; }
-  .card h3 { font-size: 15px; font-weight: 600; margin-bottom: 10px; }
-  .card p { font-size: 13px; color: var(--text-muted); line-height: 1.75; margin-bottom: 8px; }
-  .card ul { list-style: none; margin-top: 6px; }
-  .card li { font-size: 12.8px; color: var(--text-muted); padding: 4px 0 4px 16px; position: relative; line-height: 1.65; }
-  .card li::before { content: "·"; position: absolute; left: 4px; color: var(--text-hint); font-weight: bold; }
-  .card code { background: var(--bg-secondary); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
-  /* ===== 响应式 ===== */
-  @media (max-width: 768px) {
-    .hero { padding: 36px 20px 56px; }
-    .hero h1 { font-size: 26px; }
-    .highlights { grid-template-columns: 1fr; }
-    .feature-grid { grid-template-columns: 1fr; }
-    .ui-grid { grid-template-columns: 1fr; }
-    .btn-grid { grid-template-columns: 1fr; }
-    .setting-row { flex-direction: column; gap: 2px; }
-  }
+:root{
+  --paper:#f4f7f8;--surface:#ffffff;--surface-soft:#eef3f4;--ink:#173042;
+  --muted:#5c6e77;--faint:#82929a;--line:#d7e1e4;--teal:#0f6b6d;
+  --teal-soft:#e4f1f0;--green:#237a57;--green-soft:#e8f4ed;
+  --amber:#966115;--amber-soft:#fff3dc;--red:#a44242;--red-soft:#fbecec;
+  --blue:#255f85;--blue-soft:#e9f1f7;--code:#eaf0f2;
+  --sans:"Noto Sans CJK SC","Source Han Sans SC","Microsoft YaHei",system-ui,-apple-system,sans-serif;
+  --serif:"Noto Serif CJK SC","Source Han Serif SC","Songti SC",SimSun,serif;
+  --mono:"SFMono-Regular",Consolas,"Liberation Mono",monospace;
+}
+*{box-sizing:border-box}html{scroll-behavior:smooth;scroll-padding-top:24px}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.82}
+a{color:var(--teal);text-decoration-thickness:1px;text-underline-offset:3px}
+button,input{font:inherit}button{cursor:pointer}button:focus-visible,a:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid #70aaa9;outline-offset:3px}
+code,kbd{font-family:var(--mono);font-size:.9em}code{background:var(--code);border-radius:4px;padding:.12em .38em;overflow-wrap:anywhere}
+kbd{display:inline-block;min-width:1.8em;padding:0 .4em;border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;background:#fff;text-align:center;line-height:1.7}
+.wrap{width:min(1320px,100%);margin:0 auto;padding:0 16px}.masthead{padding:36px 0 28px;border-bottom:1px solid var(--line)}
+.eyebrow{display:flex;align-items:center;gap:10px;margin:0 0 18px;color:var(--teal);font-size:13px;font-weight:750;letter-spacing:.08em}
+.eyebrow:before{content:"";width:28px;height:2px;background:var(--teal)}
+h1{margin:0;max-width:1120px;font-family:var(--serif);font-size:clamp(32px,7vw,56px);font-weight:750;line-height:1.18;letter-spacing:-.035em}
+.lede{max-width:1100px;margin:20px 0 0;color:var(--muted);font-size:17px;line-height:1.9}
+.lede strong{color:var(--ink)}.meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-top:28px}
+.meta>div{min-width:0;padding-top:12px;border-top:1px solid var(--line)}.meta dt{color:var(--faint);font-size:12px;font-weight:700}.meta dd{margin:3px 0 0;font-size:14px;font-weight:650;overflow-wrap:anywhere}
+.toolbar{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;margin:24px 0}.search{position:relative;min-width:0}
+.search input{width:100%;min-height:46px;padding:10px 76px 10px 14px;border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--ink);font-size:16px}
+.search input::placeholder{color:var(--faint)}.search-count{position:absolute;right:12px;top:12px;color:var(--faint);font-size:12px;pointer-events:none}
+.tool-buttons{display:flex;gap:8px}.btn{min-width:46px;min-height:46px;padding:8px 13px;border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--ink);font-size:14px;font-weight:650}
+.btn:hover{border-color:var(--teal);color:var(--teal)}.toc-mobile{margin:0 0 24px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+.toc-mobile summary{min-height:46px;padding:10px 14px;font-weight:700;cursor:pointer}.toc-mobile nav{padding:0 14px 14px}.doc-layout{display:block}
+.toc-desktop{display:none}.toc-list{list-style:none;margin:0;padding:0}.toc-list a{display:block;padding:7px 0;color:var(--muted);font-size:13px;line-height:1.45;text-decoration:none;border-bottom:1px solid transparent}
+.toc-list a:hover,.toc-list a.active{color:var(--teal)}.toc-list a.active{font-weight:750}.toc-title{margin:0 0 10px;color:var(--faint);font-size:12px;font-weight:750}
+main{min-width:0}.doc-section{margin:0 0 28px;padding:24px 18px;background:var(--surface);border:1px solid var(--line);border-radius:10px;scroll-margin-top:20px}
+.doc-section > p,.doc-section > ul,.doc-section > ol,.doc-section > .notice,.doc-section > .defs,.doc-section > .quote{max-width:760px}
+.section-head{display:grid;grid-template-columns:auto minmax(0,1fr);gap:12px;align-items:start;margin-bottom:18px}.section-no{display:inline-grid;place-items:center;min-width:32px;height:32px;padding:0 6px;border-radius:6px;background:var(--teal-soft);color:var(--teal);font-family:var(--mono);font-size:12px;font-weight:750}
+h2{margin:0;font-family:var(--serif);font-size:25px;line-height:1.35;letter-spacing:-.02em}h3{margin:28px 0 10px;font-size:18px;line-height:1.45}h4{margin:20px 0 8px;font-size:15px}
+p{margin:10px 0}ul,ol{padding-left:1.45em}li+li{margin-top:5px}.muted{color:var(--muted)}.small{font-size:13px}.strong{font-weight:750}.nowrap{white-space:nowrap}
+.section-intro{margin:-6px 0 18px;color:var(--muted)}.rule{height:1px;margin:24px 0;background:var(--line);border:0}
+.grid{display:grid;grid-template-columns:1fr;gap:12px}.card{min-width:0;padding:16px;border:1px solid var(--line);border-radius:8px;background:#fff}.card h3,.card h4{margin-top:0}.card p:last-child{margin-bottom:0}
+.tag{display:inline-block;margin:0 5px 5px 0;padding:2px 8px;border-radius:5px;background:var(--surface-soft);color:var(--muted);font-size:12px;font-weight:700}.tag.teal{background:var(--teal-soft);color:var(--teal)}.tag.green{background:var(--green-soft);color:var(--green)}.tag.amber{background:var(--amber-soft);color:var(--amber)}.tag.red{background:var(--red-soft);color:var(--red)}
+.notice{margin:18px 0;padding:14px 16px;border:0;border-left:4px solid var(--line);border-radius:0 8px 8px 0;background:var(--surface-soft)}.notice>:first-child{margin-top:0}.notice>:last-child{margin-bottom:0}.notice-title{display:flex;gap:8px;align-items:center;margin:0 0 5px;font-weight:750}.notice-title:before{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;font-size:12px;flex:0 0 auto}
+.notice.note{background:var(--blue-soft);border-color:#cddfec}.notice.note .notice-title{color:var(--blue)}.notice.note .notice-title:before{content:"i";background:var(--blue);color:#fff}
+.notice.tip{background:var(--green-soft);border-color:#cee4d7}
+.notice.note{border-left-color:var(--blue)}.notice.tip{border-left-color:var(--green)}.notice.warn{border-left-color:var(--amber)}.notice.risk{border-left-color:var(--red)}.notice.tip .notice-title{color:var(--green)}.notice.tip .notice-title:before{content:"✓";background:var(--green);color:#fff}
+.notice.warn{background:var(--amber-soft);border-color:#ecd8b3}.notice.warn .notice-title{color:var(--amber)}.notice.warn .notice-title:before{content:"!";background:var(--amber);color:#fff}
+.notice.risk{background:var(--red-soft);border-color:#ebcfcf}.notice.risk .notice-title{color:var(--red)}.notice.risk .notice-title:before{content:"×";background:var(--red);color:#fff}
+.steps{list-style:none;padding:0;counter-reset:step}.steps>li{position:relative;padding:0 0 20px 42px;counter-increment:step}.steps>li:before{content:counter(step);position:absolute;left:0;top:1px;display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--teal);color:#fff;font-family:var(--mono);font-size:12px;font-weight:750}.steps>li:not(:last-child):after{content:"";position:absolute;left:13px;top:32px;bottom:4px;width:1px;background:var(--line)}
+.table-hint{margin:8px 0;color:var(--faint);font-size:12px}.table-wrap{width:100%;margin:14px 0;overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:#fff;-webkit-overflow-scrolling:touch}
+table{width:100%;min-width:700px;border-collapse:collapse;table-layout:fixed;font-size:13px;line-height:1.65}th,td{padding:11px 12px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line);overflow-wrap:anywhere}th{background:var(--surface-soft);color:var(--ink);font-size:12px;font-weight:750}tr:last-child td{border-bottom:0}tbody tr:hover{background:#fafcfc}
+dl.defs{margin:14px 0}.defs>div{display:grid;grid-template-columns:1fr;gap:2px;padding:11px 0;border-bottom:1px solid var(--line)}.defs>div:last-child{border-bottom:0}.defs dt{font-weight:750}.defs dd{margin:0;color:var(--muted)}
+.flow{display:grid;grid-template-columns:1fr;gap:8px;margin:16px 0}.flow-step{padding:13px;border:1px solid var(--line);border-radius:7px;background:#fff}.flow-step b{display:block;color:var(--teal);font-size:13px}.flow-step span{font-size:13px;color:var(--muted)}
+.timeline{list-style:none;margin:18px 0;padding:0}.timeline li{display:grid;grid-template-columns:82px 16px minmax(0,1fr);gap:8px;min-width:0}.timeline .time{padding-top:2px;color:var(--teal);font-family:var(--mono);font-size:12px;font-weight:750}.timeline .axis{position:relative}.timeline .axis:before{content:"";position:absolute;left:7px;top:9px;width:7px;height:7px;border-radius:50%;background:var(--teal)}.timeline .axis:after{content:"";position:absolute;left:10px;top:20px;bottom:-4px;width:1px;background:var(--line)}.timeline li:last-child .axis:after{display:none}.timeline .event{padding:0 0 20px}.timeline .event b{display:block}.timeline .event p{margin:3px 0;color:var(--muted);font-size:13px}
+details.fold{margin:12px 0;border:1px solid var(--line);border-radius:8px;background:#fff}details.fold summary{padding:12px 14px;font-weight:700;cursor:pointer}details.fold>.fold-body{padding:0 14px 14px}.checklist{list-style:none;padding:0}.checklist li{position:relative;padding-left:25px}.checklist li:before{content:"□";position:absolute;left:0;color:var(--teal);font-weight:750}
+.quote{margin:20px 0;padding:18px;background:var(--teal-soft);border-radius:8px;font-family:var(--serif);font-size:18px;line-height:1.75}.quote small{display:block;margin-top:8px;color:var(--muted);font-family:var(--sans);font-size:12px}
+.case{margin:20px 0;border-top:2px solid var(--teal);padding-top:14px}.case-label{color:var(--teal);font-size:12px;font-weight:750}.case h3{margin:4px 0 12px}.case dl{margin:0}.case dt{margin-top:12px;color:var(--muted);font-size:12px;font-weight:750}.case dd{margin:3px 0 0}
+.footer{padding:20px 0 40px;color:var(--faint);font-size:12px}.footer p{margin:4px 0}.backtop{position:fixed;right:16px;bottom:16px;z-index:20;display:none;width:46px;height:46px;border:1px solid var(--line);border-radius:50%;background:var(--surface);color:var(--teal);box-shadow:0 4px 16px #17304218}.backtop.show{display:block}.no-results{display:none;padding:30px;text-align:center;color:var(--muted)}.no-results.show{display:block}
+[hidden]{display:none!important}
+@media(min-width:640px){.wrap{padding:0 24px}.masthead{padding-top:48px}.meta{grid-template-columns:repeat(4,minmax(0,1fr))}.doc-section{padding:30px}.grid.two{grid-template-columns:repeat(2,minmax(0,1fr))}.grid.three{grid-template-columns:repeat(2,minmax(0,1fr))}.defs>div{grid-template-columns:minmax(150px,28%) minmax(0,1fr);gap:16px}.flow{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(min-width:960px){body{font-size:16px}.masthead{padding:58px 0 36px}.toc-mobile{display:none}.doc-layout{display:grid;grid-template-columns:minmax(0,1fr) 220px;gap:32px;align-items:start}.toc-desktop{display:block;position:sticky;top:24px;max-height:calc(100vh - 48px);overflow:auto;padding:4px 0 16px}.doc-section{margin-bottom:32px;padding:36px 40px;border-radius:12px}.toolbar{margin:30px 0}.grid.three{grid-template-columns:repeat(3,minmax(0,1fr))}.flow{grid-template-columns:repeat(4,minmax(0,1fr))}.lede-nowrap{white-space:nowrap}.backtop{right:28px;bottom:28px}}
+@media(min-width:1220px){.doc-layout{grid-template-columns:minmax(0,1014px) 230px;gap:90px;justify-content:space-between}.doc-section{padding:40px 46px}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{animation:none!important;transition:none!important}}
+@media print{@page{size:A4;margin:15mm}body{background:#fff;color:#000;font-size:10.5pt;line-height:1.6}.wrap{width:100%;max-width:none;padding:0}.masthead{padding:0 0 16px}.eyebrow{color:#000}.lede{font-size:11pt}.toolbar,.toc-mobile,.toc-desktop,.backtop,.table-hint{display:none!important}.doc-layout{display:block}.doc-section{margin:0 0 14px;padding:0;background:#fff;border:0;border-radius:0;break-inside:auto}.section-head{break-after:avoid}.section-no{background:#eee;color:#000}h1{font-size:28pt}h2{font-size:18pt}h3{font-size:13pt}.card,.notice,.flow-step,details.fold{break-inside:avoid;background:#fff}.table-wrap{overflow:visible;border-color:#bbb}table{min-width:0;font-size:8.5pt}th,td{padding:6px}.footer{padding:16px 0}.timeline .event,.steps>li{break-inside:avoid}a{color:#000;text-decoration:none}code{background:#eee}.backtop{display:none!important}}
+
+.notice.note{border-left-color:var(--blue)}
+.notice.tip{border-left-color:var(--green)}
+.notice.warn{border-left-color:var(--amber)}
+.notice.risk{border-left-color:var(--red)}
 </style>
 </head>
 <body>
-
-<!-- ===== Hero ===== -->
-<div class="hero">
-  <div class="hero-title">
-    <h1>萌宝小秘书</h1>
-    <div class="version">v1.6</div>
-  </div>
+<div class="wrap">
+<header class="masthead">
+  <p class="eyebrow">使用指南 · 正式版 v1.7</p>
+  <h1>萌宝小秘书 · 使用指南</h1>
+  <div class="lede">从“我在哪个页面”出发，找到正确的球与全局设置。<strong>先分清入口，再理解数据边界</strong>，比背下一整页按钮更有用。</div>
+  <dl class="meta"><div><dt>对应脚本</dt><dd>v1.7 正式版 · 7,609 行</dd></div><div><dt>版本状态</dt><dd>正式版 · 已过真机验收</dd></div><div><dt>常驻入口</dt><dd>四个球 · 按页面出现</dd></div><div><dt>设置结构</dt><dd>通用 7 项 · 看图 6 项</dd></div><div><dt>数据位置</dt><dd>本地浏览器 · 按账号分桶</dd></div></dl>
+</header>
+<div class="toolbar" role="search">
+  <div class="search"><input id="docSearch" type="search" placeholder="查找功能或关键词" aria-label="查找本页内容"><span id="searchCount" class="search-count" aria-live="polite"></span></div>
+  <div class="tool-buttons"><button class="btn" id="clearSearch" type="button" title="清空查找">清空</button><button class="btn" id="printDoc" type="button" title="打印或另存为 PDF">打印</button></div>
 </div>
-
-<div class="container">
-
-  <!-- ===== 核心亮点 ===== -->
-  <div class="highlights">
-    <div class="highlight-card">
-      <div class="icon-wrap">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4096ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-          <circle cx="8.5" cy="8.5" r="1.5"/>
-          <polyline points="21 15 16 10 5 21"/>
-        </svg>
-      </div>
-      <h3>看图预览</h3>
-      <p>列表页、搜索页、收藏页都能直接看图，点击打开全屏画廊，再也不用一个个点进去看</p>
-    </div>
-    <div class="highlight-card">
-      <div class="icon-wrap">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4096ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M17 1l4 4-4 4"/>
-          <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
-          <path d="M7 23l-4-4 4-4"/>
-          <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
-        </svg>
-      </div>
-      <h3>智能翻页</h3>
-      <p>点一下翻页球就把下一页接在列表后面，不用跳转页面；右键可让它自动翻到底，翻页后自动联动搜索和看图缓存</p>
-    </div>
-    <div class="highlight-card">
-      <div class="icon-wrap">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4096ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-        </svg>
-      </div>
-      <h3>收藏用户</h3>
-      <p>喜欢的用户一键加星，他发的帖子在列表页自动高亮，再也不怕刷丢</p>
-    </div>
-  </div>
-
-  <!-- ===== 一、三步快速上手 ===== -->
-  <div class="feature-section">
-    <h2 class="section-title">一、三步快速上手</h2>
-    <div class="steps">
-      <div class="step-list">
-        <div class="step">
-          <div class="step-num">1</div>
-          <div class="step-content">
-            <h5>打开任意板块列表页</h5>
-            <p>脚本自动生效。帖子下方会出现图片缩略图，屏幕左侧出现悬浮球。板块列表页上是<strong>翻页球（紫）</strong>和<strong>看图球（蓝）</strong>两个；搜索页/导读页多一个<strong>过滤球（绿）</strong>；帖子详情页则是<strong>增强球（近白）</strong>。</p>
-          </div>
-        </div>
-        <div class="step">
-          <div class="step-num">2</div>
-          <div class="step-content">
-            <h5>点一下悬浮球试试功能</h5>
-            <p>先点最下面的翻页球左键，加载下一页；再点看图球的左键，把整页的图都加载出来。想看全屏，点帖子下方的缩略图即可。</p>
-          </div>
-        </div>
-        <div class="step">
-          <div class="step-num">3</div>
-          <div class="step-content">
-            <h5>打开设置调整偏好</h5>
-            <p>油猴菜单里的「设置」。画廊背景色、卡片色、收藏高亮背景和标题色都能自定义；收藏用户在设置里的「收藏馆」入口卡片进入。</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ===== 二、四个悬浮球 ===== -->
-  <div class="feature-section">
-    <h2 class="section-title">二、四个悬浮球</h2>
-    <p class="section-intro">
-      四个球都固定在<strong>屏幕左侧</strong>，从上到下排列、互不重叠，全部可以<strong>按住拖动</strong>改位置，松手后位置会被记住。<br>
-      不是每个页面都有四个：过滤球只在搜索页/导读页出现，增强球只在帖子详情页出现。
-    </p>
-
-    <div class="fab-guide">
-
-      <div class="fab-item">
-        <div class="fab-demo fab-demo-guolv">🎯</div>
-        <div class="fab-info">
-          <h5>过滤球（绿色）</h5>
-          <div class="fab-where">出现位置：<b>搜索页、导读页</b></div>
-          <p><b>左键</b>：打开 / 收起板块过滤面板</p>
-          <p><b>右键</b>：打开屏蔽词设置弹窗（关键词规则，可勾选「仅过滤当前板块」）</p>
-          <p><b>拖拽</b>：移动位置</p>
-          <div class="status-row"><span class="status status-idle-green">常驻绿色，无状态变化</span></div>
-        </div>
-      </div>
-
-      <div class="fab-item">
-        <div class="fab-demo fab-demo-zengqiang">⚡</div>
-        <div class="fab-info">
-          <h5>增强球（近白）</h5>
-          <div class="fab-where">出现位置：<b>帖子详情页</b></div>
-          <p><b>左键</b>：打开 / 收起功能面板</p>
-          <p><b>右键</b>：打开评论侧边面板</p>
-          <p><b>拖拽</b>：移动位置</p>
-          <p>面板里是画廊、收藏帖子、评分、购买、附件跳转等入口</p>
-          <div class="status-row"><span class="status status-idle-neutral">常驻近白，无状态变化</span></div>
-        </div>
-      </div>
-
-      <div class="fab-item">
-        <div class="fab-demo fab-demo-kantu">🖼️</div>
-        <div class="fab-info">
-          <h5>看图球（蓝色）</h5>
-          <div class="fab-where">出现位置：<b>板块列表页、搜索页、空间收藏页、导读页、用户主题页</b></div>
-          <p><b>左键</b>：开启 / 停止持续加载（把列表里所有帖子的图都加载出来）</p>
-          <p><b>右键</b>：停止加载并收起所有图片预览（缓存保留）</p>
-          <p><b>拖拽</b>：移动位置</p>
-          <div class="status-row">
-            <span class="status status-idle-blue">浅蓝 · 就绪</span>
-            <span class="status status-on-blue">蓝色描边 + 光晕 + 旋转 · 持续加载中</span>
-            <span class="status status-off-gray">灰 · 已收起</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="fab-item">
-        <div class="fab-demo fab-demo-pager">📄</div>
-        <div class="fab-info">
-          <h5>翻页球（紫色）</h5>
-          <div class="fab-where">出现位置：<b>板块列表页、搜索页、空间收藏页、小黑屋、导读页、用户主题页、用户回复页</b></div>
-          <p><b>左键</b>：加载下一页（点一次加一页）</p>
-          <p><b>右键</b>：开启自动翻页，一页页追到末页；再点左键或右键即停止</p>
-          <p><b>拖拽</b>：移动位置</p>
-          <p>球下方有紫色「共 N 页」小标签，加载后会显示当前已累积到第几页；加载慢时会临时变成「加载中…」</p>
-          <div class="status-row">
-            <span class="status status-idle-purple">浅紫 · 就绪</span>
-            <span class="status status-on-purple">紫色描边 + 光晕 + 旋转 · 持续加载中</span>
-          </div>
-        </div>
-      </div>
-
-    </div>
-
-    <div class="tip" style="margin-top:16px;">
-      <b>位置乱了怎么办：</b>打开设置 → 点「📍 重置位置」，四个球会立刻回到默认位置（左侧 24px，从下往上 200 / 280 / 360 / 720px），不用刷新。
-    </div>
-  </div>
-
-    <!-- ===== 三、全部功能一览 ===== -->
-  <div class="feature-section">
-    <h2 class="section-title">三、全部功能一览</h2>
-    <div class="feature-grid">
-
-      <div class="feature-item">
-        <h4><span class="dot"></span>萌宝看图</h4>
-        <p>多场景支持：版块列表页、搜索页、导读页、收藏页、用户主题页都能直接预览图片。</p>
-        <ul>
-          <li>点击缩略图打开全屏画廊，画廊是一整面格子墙，每格一张图</li>
-          <li>点格子进单张大图，图片按窗口适配：小图保持<strong>原始尺寸</strong>不放大，大图等比缩到窗口内、整张完整可见</li>
-          <li>切图用普通滚轮，缩放用 <strong>Ctrl + 滚轮</strong>（0.3–5 倍）；大图状态不接管拖动，想 1:1 看细节就用它放大</li>
-          <li>顶部条上有旋转按钮，点一次转 90°</li>
-          <li>退出有三种：<strong>双击图片</strong>、<strong>点顶部那一整条</strong>、按 <strong>Esc</strong>；小图四周的空白也能点出去</li>
-          <li>不同帖子的图之间用一条分隔线隔开，不会混成一片</li>
-          <li>关闭大图回到列表后，刚才看的那张会闪一圈琥珀色光圈帮你定位</li>
-          <li>画廊背景色、卡片色可自定义；已加载的图片本地缓存，下次打开更快</li>
-        </ul>
-      </div>
-
-      <div class="feature-item">
-        <h4><span class="dot"></span>设置与导入导出</h4>
-        <p>所有配置都在设置面板里调整，支持全量导出/导入，换设备一键迁移。</p>
-        <ul>
-          <li>设置弹窗防误关：点遮罩不会关，只有「取消 / 保存设置」能退出</li>
-          <li>颜色类设置<strong>保存后立即生效</strong>，不用刷新页面；排序、白名单等少数项仍需刷新</li>
-          <li>「恢复默认」清空全部记录并自动刷新，不需要手动刷；<strong>站点白名单会保留</strong></li>
-          <li>收藏、头像、浏览历史、过滤词均<strong>按账号独立</strong>，换账号各看各的</li>
-          <li>收藏馆支持单独导出/导入，可以只搬收藏这一块</li>
-          <li>全量导出含参数、收藏、评分、收藏用户与站点白名单；<strong>不含</strong>悬浮球位置、看图缓存和已读历史</li>
-          <li>有「调试日志」开关，排查问题时打开</li>
-          <li>右上角「📖 使用帮助」可重新弹出新手上手引导</li>
-        </ul>
-      </div>
-
-      <div class="feature-item">
-        <h4><span class="dot"></span>萌宝搜索 / 过滤</h4>
-        <p>左键开板块过滤面板筛板块，右键开屏蔽词设置（支持精确、正则与排除词）。</p>
-        <ul>
-          <li>过滤词语法：<code>广告</code> 含词即藏、<code>=求资源</code> 精确匹配、<code>/公告/</code> 正则匹配、<code>!置顶</code> 排除词</li>
-          <li>支持「仅过滤当前板块」作用域</li>
-          <li>过滤词弹窗有「取消」按钮——点取消不保存，不会误改</li>
-          <li>过滤配置按账号独立：多账号登录各筛各的</li>
-        </ul>
-      </div>
-
-      <div class="feature-item">
-        <h4><span class="dot"></span>收藏用户</h4>
-        <p>楼层、列表页、资料页、个人主题页与个人回复页都能点星星收藏用户。
-        <ul>
-          <li>收藏后他的帖子在列表页和搜索结果页都自动高亮（蓝底橙标题）</li>
-          <li>高亮颜色可在设置里自定义</li>
-          <li>所有收藏用户集中在独立的「收藏馆」弹窗里管理，不在通用设置里</li>
-          <li>支持分组管理（拖拽排序、右键重命名/删除）、导出导入</li>
-        </ul>
-      </div>
-
-      <div class="feature-item">
-        <h4><span class="dot"></span>浏览历史（已读标记）</h4>
-        <p>你看过的帖子标题会自动变灰，下次再刷到一眼就知道「这个我看过了」。</p>
-        <ul>
-          <li>覆盖<strong>版块列表页、搜索结果页、个人主题页</strong>三处，翻页后新加载的行也会自动补上</li>
-          <li>三态可选：<strong>关闭 / 变灰划线 / 只变灰</strong>，默认「变灰划线」。只加已读态、不做高亮，收藏用户的名字仍保持收藏色</li>
-          <li>底色可在设置里改，改完<strong>保存即生效</strong>，搜索结果页同样跟随</li>
-        </ul>
-      </div>
-
-      <div class="feature-item">
-        <h4><span class="dot"></span>窄屏模式</h4>
-        <p>嫌 1200 版心太宽，可以一键压回 3.4 时代的 960。</p>
-        <ul>
-          <li>只作用于<strong>版块列表、导读、帖子、搜索页</strong>四类阅读页，默认关闭</li>
-          <li>首页、个人中心设置、勋章、排行榜保持论坛原样——这几页内部有定宽组件，收窄后必错位</li>
-          <li>导航条、页头 logo、右上用户信息、页脚边缘一起收窄，不是只窄中间而两边错位</li>
-          <li>切到论坛「全屏」档时自动放开，不会叠加</li>
-        </ul>
-      </div>
-
-      <div class="feature-item">
-        <h4><span class="dot"></span>评论侧边面板</h4>
-        <p>右侧边栏实时显示帖子评论流，增强球右键可打开。</p>
-        <ul>
-          <li>支持评论翻页</li>
-          <li>支持关键词过滤</li>
-          <li>评论列表可按最小字数过滤，太短的评论自动隐藏</li>
-          <li>面板宽度可用滑条调整</li>
-        </ul>
-      </div>
-
-      <div class="feature-item">
-        <h4><span class="dot"></span>萌宝翻页</h4>
-        <p>两种模式：左键加载下一页（接在列表后面），右键开自动翻页，一页页追到末页。</p>
-        <ul>
-          <li>翻页后自动联动搜索面板与看图缓存</li>
-          <li>支持调整翻页延时（0–10 秒），防止请求过快</li>
-          <li>评论面板的翻页栏有「尾页」，可直接跳到最后一页</li>
-          <li>小黑屋页也支持持续加载</li>
-        </ul>
-      </div>
-
-      <div class="feature-item">
-        <h4><span class="dot"></span>自定义头像昵称</h4>
-        <p>评论侧边面板和收藏馆里可以用自己的头像和昵称。</p>
-        <ul>
-          <li>固定 9 个槽位，<strong>点哪一格就放进哪一格</strong>，空着的槽位保留位置</li>
-          <li>可拖拽调整顺序：拖到空格是移动，拖到已有头像的格子是两者交换；删掉的格子留空、后面不前移</li>
-          <li>不再自带内置头像，全部由自己添加；本地压缩，不上传服务器</li>
-          <li>评论区、收藏馆共用同一套头像</li>
-        </ul>
-      </div>
-
-      <div class="feature-item">
-        <h4><span class="dot"></span>右键点击用户名</h4>
-        <p>右键点任意用户名，弹出快捷菜单，直达对方主页。</p>
-        <ul>
-          <li>五处都能用：<strong>列表页、搜索结果页、帖子详情页、收藏馆、评论侧边面板</strong></li>
-          <li>默认去「个人资料」，可在设置里改成「个人主题」或「个人回复」</li>
-          <li>跳转地址带完整参数，点「个人主题」直接落到对方的主题列表</li>
-          <li>不想用可在设置里选「关闭」，右键恢复浏览器原生菜单</li>
-        </ul>
-      </div>
-
-    </div>
-  </div>
-
-<!-- ===== 四、设置面板详解 ===== -->
-  <div class="feature-section">
-    <h2 class="section-title">四、设置面板详解</h2>
-    <p class="section-intro">
-      打开方式：油猴菜单里的「设置」。面板分四块：通用设置、萌宝看图、收藏馆入口、底部按钮区。
-    </p>
-
-    <div class="setting-block">
-      <h4><span class="ico">⚙️</span>通用设置</h4>
-      <div class="setting-list">
-        <div class="setting-row">
-          <span class="name">窄屏模式</span>
-          <span class="desc">把论坛版心从 1200 压回 960。默认关闭。只作用于版块列表、导读、帖子、搜索页；首页、个人中心、勋章、排行榜保持论坛原样，切到全屏档时自动放开。保存后会提示当前页是否已生效。</span>
-        </div>
-        <div class="setting-row">
-          <span class="name">已读标记</span>
-          <span class="desc">浏览过的帖子怎么标记：关闭 / 变灰划线 / 只变灰。默认「变灰划线」。改完保存即生效，搜索结果页同样跟随。</span>
-        </div>
-        <div class="setting-row">
-          <span class="name">已读标记底色</span>
-          <span class="desc">已读帖子整行的底色，只对未收藏的帖子生效。默认 #f0f0f0。</span>
-          <span class="default">默认 #f0f0f0</span>
-        </div>
-        <div class="setting-row">
-          <span class="name">按发帖时间排序</span>
-          <span class="desc">开启后，所有板块自动按发帖时间倒序排列，永远看最新的。默认开启。</span>
-        </div>
-        <div class="setting-row">
-          <span class="name">翻页延时（秒）</span>
-          <span class="desc">自动翻页时每页之间的等待间隔，防止请求过快。范围 0–10，默认 5。</span>
-        </div>
-        <div class="setting-row">
-          <span class="name">右键点击用户名</span>
-          <span class="desc">右键点用户名弹出的快捷菜单去哪个页面：个人资料 / 个人主题 / 个人回复，最后一项「关闭」表示不接管右键、保留浏览器原生菜单。默认「个人资料」。</span>
-        </div>
-      </div>
-    </div>
-
-    <div class="setting-block">
-      <h4><span class="ico">🖼️</span>萌宝看图（6 项）</h4>
-      <div class="setting-list">
-        <div class="setting-row">
-          <span class="name">画廊背景色</span>
-          <span class="desc">全屏画廊的大背景色</span>
-          <span class="default">默认 #faf8f5</span>
-        </div>
-        <div class="setting-row">
-          <span class="name">画廊卡片色</span>
-          <span class="desc">画廊里每张图片格的底色</span>
-          <span class="default">默认 #f8fafc</span>
-        </div>
-        <div class="setting-row">
-          <span class="name">收藏高亮背景</span>
-          <span class="desc">列表页收藏用户那一行的整行底色</span>
-          <span class="default">默认 #dbeafe</span>
-        </div>
-        <div class="setting-row">
-          <span class="name">收藏高亮标题</span>
-          <span class="desc">收藏用户帖子标题的文字色</span>
-          <span class="default">默认 #d97706</span>
-        </div>
-        <div class="setting-row">
-          <span class="name">预览图数量</span>
-          <span class="desc">帖子标题下并排显示几张预览图。默认 3 张。</span>
-          <span class="default">默认 3</span>
-        </div>
-        <div class="setting-row">
-          <span class="name">预览图高度</span>
-          <span class="desc">单张预览图的高度，范围 120–320。默认 200。</span>
-          <span class="default">默认 200</span>
-        </div>
-      </div>
-    </div>
-
-    <div class="setting-block">
-      <h4><span class="ico">⭐</span>萌宝收藏（入口）</h4>
-      <div class="setting-list">
-        <div class="setting-row">
-          <span class="name">收藏馆入口</span>
-          <span class="desc">设置里只放一张卡片，显示「收藏馆」和当前的「N 位用户 · M 个分组」，右侧一个「打开」按钮。</span>
-        </div>
-        <div class="setting-row">
-          <span class="name">收藏馆弹窗</span>
-          <span class="desc">点开「打开」进入独立弹窗，宽 900px。从上到下是标题行（含「✏️ 编辑」与右上角 ×）、分组胶囊行、用户胶囊列表、三个管理按钮。拖胶囊可排序；拖到上方分组 tab 上松手即归入该组；右键胶囊进入该用户主页。</span>
-        </div>
-        <div class="setting-row">
-          <span class="name">三个管理按钮</span>
-          <span class="desc">新建分组、导出、导入，都在收藏馆弹窗底部。</span>
-        </div>
-        <div class="setting-row">
-          <span class="name">批量编辑</span>
-          <span class="desc">点标题行右侧「✏️ 编辑」进入勾选模式，工具条展开：全选 / 移入分组 / 删除选中 (N) / 取消。移入分组时弹窗选目标，「未分组」表示移出分组；批量移动后自动退出编辑态。</span>
-        </div>
-      </div>
-    </div>
-
-    <div class="setting-block">
-      <h4><span class="ico">🔘</span>底部按钮区（6 个）</h4>
-      <div class="btn-grid">
-        <div class="btn-card"><b>👤 头像设置</b><span>评论区和收藏馆的头像、昵称、多槽位管理</span></div>
-        <div class="btn-card"><b>📍 重置位置</b><span>四个悬浮球立刻回到默认位置，不用刷新</span></div>
-        <div class="btn-card"><b>🧹 清除缓存</b><span>清空看图模块已缓存的图片</span></div>
-        <div class="btn-card"><b>📤 导出配置</b><span>全部配置导出成 JSON 到剪贴板</span></div>
-        <div class="btn-card"><b>📥 导入配置</b><span>从剪贴板 JSON 恢复全部配置</span></div>
-        <div class="btn-card"><b>↩️ 恢复默认</b><span>清空所有设置、收藏、位置、缓存，回到出厂状态（站点白名单保留）；点完弹窗立即关闭，页面自动刷新</span></div>
-      </div>
-      <div class="tip" style="margin:14px 0 0;">
-        <b>底部还有一行：</b>左边是「调试日志」开关（排查问题用，<strong>即时生效</strong>，不用刷新），右边是「取消 / 保存设置」。<br>
-        <b>右上角：</b>「📖 使用帮助」——点了会重新弹一遍新手上手引导卡片；旁边的「ℹ️ 关于」显示当前版本、作者、仓库与使用指南地址。
-      </div>
-    </div>
-  </div>
-
-  <!-- ===== 五、界面入口在哪 ===== -->
-  <div class="feature-section">
-    <h2 class="section-title">五、界面入口在哪</h2>
-    <div class="ui-guide">
-      <div class="ui-grid">
-        <div class="ui-item">
-          <h5>左侧悬浮球</h5>
-          <p>固定在屏幕<strong>左边</strong>，从下往上依次是翻页（📄）、看图（🖼️）、增强（⚡）、过滤（🎯）。全部可拖动。</p>
-        </div>
-        <div class="ui-item">
-          <h5>油猴菜单</h5>
-          <p>浏览器右上角油猴图标 → 萌宝小秘书，里面有两项：<strong>🌐 白名单管理</strong> 和 <strong>设置</strong>。</p>
-        </div>
-        <div class="ui-item">
-          <h5>设置面板</h5>
-          <p>从油猴菜单「设置」进入。宽 600px，含通用设置、看图配色、收藏馆入口、6 个按钮。</p>
-        </div>
-        <div class="ui-item">
-          <h5>白名单管理</h5>
-          <p>从油猴菜单「🌐 白名单管理」进入。默认已内置常用站群域名，可自行增删；不在名单里的站点不加载。这个入口不依赖当前页面，人在任何网站上都能打开它加域名，不用先打开目标论坛。填了无效内容会拒绝保存并提示，不会静默变回默认域名。</p>
-        </div>
-        <div class="ui-item">
-          <h5>评论侧边面板</h5>
-          <p>帖子详情页里，右键点增强球（⚡）打开。显示实时评论流，可翻页、可按字数过滤，面板宽度用滑条调整。</p>
-        </div>
-        <div class="ui-item">
-          <h5>画廊</h5>
-          <p>点任意帖子下方的缩略图进入。顶部标题栏显示帖子标题和「共 N 张」计数。</p>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ===== 六、弹窗与数据约定 ===== -->
-  <div class="feature-section">
-    <h2 class="section-title">六、弹窗与数据约定</h2>
-    <div class="feature-grid">
-      <div class="feature-item">
-        <h4><span class="dot"></span>弹窗防误关</h4>
-        <p>白名单、过滤词、通用设置、头像设置等主要弹窗统一规则：</p>
-        <ul>
-          <li>点遮罩<strong>不会</strong>关闭弹窗</li>
-          <li>只能点「取消」或「保存 / 确定 / 导入」退出</li>
-          <li>「取消」不保存任何改动，无副作用</li>
-        </ul>
-      </div>
-      <div class="feature-item">
-        <h4><span class="dot"></span>数据按账号隔离</h4>
-        <p>以下数据全部按登录用户 ID 分开存，换账号各看各的：</p>
-        <ul>
-          <li>收藏用户、评分记录</li>
-          <li>浏览历史、已读标记</li>
-          <li>过滤词配置、头像</li>
-          <li>四个悬浮球的位置和折叠状态</li>
-        </ul>
-      </div>
-    </div>
-  </div>
-
-    <!-- ===== 七、1.0：起点 ===== -->
-  <div class="feature-section">
-    <h2 class="section-title">七、1.0：起点</h2>
-    <p class="section-intro">1.0 是脚本的第一个正式发布版，能力骨架在这一版定下来；后面的 1.1 到 1.4 都是在这套骨架上修补，没有推翻重做。所以本指南以 1.5 为准来写功能，版本变化从 1.0 这个起点往下排。</p>
-
-    <div class="card">
-      <h3>1.0 定下来的能力</h3>
-      <ul>
-        <li>四颗悬浮球：看图、翻页、过滤、增强</li>
-        <li>全屏图片画廊与单张大图查看器（滚轮切图、Ctrl + 滚轮缩放）</li>
-        <li>列表页持续翻页、搜索页板块过滤与关键词黑名单</li>
-        <li>收藏用户（收藏馆 + 分组管理）与收藏帖子</li>
-        <li>评分弹窗自动填满分、评论侧边面板</li>
-        <li>浏览历史已读标记、自定义头像昵称</li>
-        <li>域名白名单管理、全量配置导出/导入</li>
-      </ul>
-    </div>
-
-    <div class="card">
-      <h3>下面四节怎么读</h3>
-      <p>按「你在使用中会注意到什么变化」来列，不按代码顺序。开发期那些 beta 迭代过程不在指南里展开——只讲 1.0 之后每个正式版改了什么。</p>
-    </div>
-  </div>
-
-<!-- ===== 八、1.1 版本变化 ===== -->
-  <div class="feature-section">
-  <h2 class="section-title">八、1.0 → 1.1 有什么变化</h2>
-
-  <p class="intro-text">1.1 动的主要是「看图」和「评分」两块，都是实际用起来会觉得别扭的地方。这里按「你会注意到什么」来列，不按代码顺序。</p>
-
-  <div class="card">
-    <h3>大图不再缩到刚好装下，改成原尺寸</h3>
-    <p>以前大图会等比缩到「整张刚好塞进屏幕」。一张整屏截图放到满屏时，图顶到边、四周一点缝都不剩——想退出都没地方点。现在改成<strong>按原始像素显示</strong>：不放大也不缩小，居中摆着，超出屏幕的部分自己溢出。</p>
-    <p>特别大的图（三千多像素宽那种）默认只能看到中间一块，想看边缘用 <strong>Ctrl + 滚轮缩小</strong>（0.3–5 倍）。<strong>这条在 1.2 又调整回去了</strong>，见下一节「1.1 → 1.2」。</p>
-  </div>
-
-  <div class="card">
-    <h3>退出大图：双击、点顶部条、Esc</h3>
-    <p>以前只有「点图片外面那一圈黑」能退出，整屏截图铺满时这一圈根本不存在。现在三个出口：</p>
-    <ul>
-      <li><strong>双击图片</strong>——单击不退出，避免手滑划走</li>
-      <li><strong>点顶部那一整条</strong>——含计数区域，条上任何空白都能点</li>
-      <li><strong>Esc</strong></li>
-    </ul>
-    <p>小图四周仍有留白，点空白照样能退。关闭按钮也从「只有从帖子列表进来才显示」改成<strong>一直显示</strong>。</p>
-  </div>
-
-  <div class="card">
-    <h3>顶部条重新做了一遍</h3>
-    <p>高度 56 → 52，渐变收得更干脆，不再是糊一层黑；底部加了一条极细的白线做分界。计数从白底胶囊改成纯文字，亮图黑图都压得住。</p>
-    <p>按钮从「深底 + 白边」改成玻璃感的白描边，鼠标移上去只提亮、不再整颗放大跳动；关闭键单独区分，移上去变暖红，一眼看出是退出。</p>
-  </div>
-
-  <div class="card">
-    <h3>拖动功能取消了</h3>
-    <p>原尺寸下本来能按住拖动，但看图这件事本身就是看中间，拖来拖去反而容易误操作。现在不拖了，光标也不再是抓手。</p>
-  </div>
-
-  <div class="card">
-    <h3>评分自动填满分</h3>
-    <p>打开评分弹窗时，分数直接填到这一项的上限，你只选理由、点确定。上限是从评分下拉选项里读的（论坛没把它写在输入框的 max 属性里），有几项评分就各填各的。</p>
-    <p>论坛的 ajax 偶尔会把值刷回 0，脚本会在 250ms 和 900ms 各补一次；你自己改数字或点下拉，脚本立刻停手。</p>
-  </div>
-
-  <div class="card">
-    <h3>重复评分不再叠三条提示</h3>
-    <p>对同一个帖子重复评分时，以前会同时出现论坛弹窗、红色 toast、深色提示三条。现在脚本这边不弹了，只把「👍 评分」按钮标成已评，屏幕上只留论坛那一个带「确定」的弹窗。其他评分错误仍会给红色提示。</p>
-  </div>
-
-  <div class="card">
-    <h3>个人主题页也有已读标记了</h3>
-    <p>以前只有版块列表页和搜索结果页会标已读，点进某个人的「个人主题」列表，看过的帖子还是正常颜色。现在这一页也标了——灰底、标题变灰加划线，不做高亮，收藏用户的名字仍保持收藏色。</p>
-    <p>判定前提不变：得先打开过那个帖子才会变灰。</p>
-  </div>
-
-  </div>
-
-  <!-- ===== 九、1.2 版本变化 ===== -->
-  <div class="feature-section">
-  <h2 class="section-title">九、1.1 → 1.2 有什么变化</h2>
-
-  <p class="intro-text">1.2 没有加新功能，主线是三件事：<strong>收藏馆的编辑与归组交互重做</strong>、<strong>下线「收藏关键词」</strong>、以及<strong>修掉一批看起来「功能坏了」的隐性 bug</strong>。照样按「你会注意到什么」来列，不按代码顺序。</p>
-
-  <div class="card">
-    <h3>「收藏关键词」下线了</h3>
-    <p>以前帖子页右侧的评论面板上有「评论区 / 收藏馆」两个标签页，收藏馆那一页用来存关键词、按关键词找帖子。1.2 起这块整体移除。</p>
-    <ul>
-      <li>评论面板现在只剩评论，不再有标签切换</li>
-      <li>收藏馆弹窗底部的「🔍 收藏关键词 N 个」入口一并去掉</li>
-      <li>本地残留的关键词数据会在脚本启动时自动清掉，不用手动删</li>
-    </ul>
-  </div>
-
-  <div class="card">
-    <h3>收藏馆：编辑不再单独占一行</h3>
-    <p>以前「✏️ 编辑」按钮独占一行，下面再跟一条工具条，弹窗上半部分很挤。现在：</p>
-    <ul>
-      <li>「✏️ 编辑」放进标题行右侧，和右上角的 <strong>×</strong> 并排，非编辑态不占额外高度</li>
-      <li>点「编辑」后工具条才整条展开：全选 / 移入分组 / 删除选中 (N) / 取消</li>
-      <li>底部原来那行「关闭」删掉了，统一用右上角 ×（点遮罩、按 Esc 也照样能关）</li>
-    </ul>
-  </div>
-
-  <div class="card">
-    <h3>编辑态可以直接「移入分组」</h3>
-    <p>以前要换分组只能一个个拖。现在勾选一批用户后，点「移入分组」弹出分组选择面板，点目标分组就整批搬过去，<strong>搬完自动退出编辑态</strong>——因为列表会变，保留选中容易误删看不见的条目。</p>
-    <p>另外「未分组」的提示改成「已把 N 位用户移出分组」，不再说成移入一个叫「未分组」的组。</p>
-  </div>
-
-  <div class="card">
-    <h3>拖胶囊换分组：不再弹新窗口，光标也不再变禁止</h3>
-    <p>拖拽修了两个问题：</p>
-    <ul>
-      <li>拖到空白处松手，以前浏览器会当成纯文本<b>新开一个窗口搜索「uid:455002」</b>；现在拖拽数据改成自定义类型，不会再触发</li>
-      <li>拖动过程中光标中途显示 <strong>⊗</strong>（禁止），但分组 tab 其实已经高亮——现在拖胶囊期间临时关掉分组 tab 自身的拖拽属性，从拿起胶囊到松手全程都是可移动光标</li>
-    </ul>
-    <p>落点行为不变：拖到自定义分组 tab 归组、拖到「未分组」移出分组、拖到「全部」明确拒绝。</p>
-  </div>
-
-  <div class="card">
-    <h3>胶囊不再「鼠标一划过就变宽」</h3>
-    <p>以前鼠标停在胶囊上会展开「切换分组 / ✕」两个图标，胶囊变宽，把后面的胶囊挤到第二行，整片列表跟着跳。现在胶囊宽度恒定，那些图标改成了编辑态的勾选框——只在你要批量操作时才出现。</p>
-  </div>
-
-  <div class="card">
-    <h3>分组多到放不下时，改成横向滚动</h3>
-    <p>分组 tab 原来会换行，组一多就把弹窗撑高。现在锁成单行、左右滚动（滚动条隐藏），切到靠右的分组再重画也不会跳回开头。tab 改成浅灰底、胶囊仍是白底描边，两层能分清。</p>
-  </div>
-
-  <div class="card">
-    <h3>大图改成「整张看得见」</h3>
-    <p>1.1 把大图改成了按原始像素显示，结果超大图（比如 1536×2048）在 1080 高的屏幕上只能看到中间一块，四周被裁掉，想退出都找不到边。1.2 改回<strong>按窗口适配</strong>：</p>
-    <ul>
-      <li>比窗口大的图，等比缩到窗口内，<strong>整张完整可见、不裁剪</strong></li>
-      <li>比窗口小的图，保持原始尺寸，<strong>不放大</strong></li>
-      <li>左右留白从 56px 收到 24px，横图能多显示一点</li>
-      <li>想 1:1 看细节，仍然用 <strong>Ctrl + 滚轮</strong>放大</li>
-    </ul>
-  </div>
-
-  <div class="card">
-    <h3>评论面板空白修复</h3>
-    <p>1.2 早期版本里，帖子页的评论面板会变成<strong>只有头像、「N 条评论」标题和一条宽度滑条，中间全空</strong>。原因是模板里多包了一层 <code>&lt;template&gt;</code>，被运行时编译当成原生元素，把分页行和评论列表整块吞掉了。修复后列表正常显示，分页也能用。</p>
-  </div>
-
-  <div class="card">
-    <h3>搜索页宽度和论坛对齐了</h3>
-    <p>搜索页的内容宽度从 1400 收回到 <strong>1200</strong>，和论坛列表页、首页、帖子页的版心一致，四页左右边缘完全重合（47 / 1247）。搜索页本身没有 <code>#wp</code> 容器，所以把外层 <code>#ct</code> 也一并收进版心；卡片左右各 12px 的内边距去掉，边缘更齐。</p>
-  </div>
-
-  <div class="card">
-    <h3>收藏星标不再挂错地方</h3>
-    <p>以前打开短消息（<code>do=pm</code>）、提醒（<code>do=notice</code>）这类页面，右上角「当前登录用户」名字后面也会多出一个收藏星标。原因是这些页面和「个人资料页」共用同一个地址参数。现在只认资料页和个人主题页，其它子页面不再挂星标。</p>
-  </div>
-
-  </div>
-
-<div class="feature-section">
-  <h2 class="section-title">十、1.2 → 1.3 有什么变化</h2>
-  <p class="section-intro">这一版主要做了三件事：砍掉用不上的功能、把头像做顺、把「改了设置要刷新」这个别扭的地方改掉。</p>
-
-  <div class="card">
-    <h3>「缩小显示」整套下线</h3>
-    <p>增强球面板顶部那对「正常显示 / 缩小显示」胶囊已移除，帖子内图片恢复与不开脚本时一致的显示。原因很直接：这个开关和「点图进大图」的功能重叠，用得很少，却要在面板里常年占一行。</p>
-  </div>
-
-  <div class="card">
-    <h3>内置头像全部移除，改成 9 格自己搭</h3>
-    <p>以前自带的「萌 / 桃」两个内置头像和「恢复内置默认头像」按钮都删了。现在是 9 个空格位，<strong>点哪一格就放进哪一格</strong>，不再强制从第一个开始往后排。</p>
-    <p>支持拖拽换位：拖到空位是移动，拖到已有头像的格子是两者交换。删掉一个头像后那格留空，后面的不往前挤。</p>
-  </div>
-
-  <div class="card">
-    <h3>设置改完不用再刷新了</h3>
-    <p>画廊背景色、画廊卡片色、收藏高亮背景、收藏高亮标题、已读标记底色、已读删除线这 6 项，以及「已读帖子标记」总开关，<strong>保存后当场生效</strong>。以前要手动刷一次页面才看得到效果。</p>
-    <p>「恢复默认」也改顺了：以前点完要等 1.5 秒才自动刷新，而这个窗口里任何一次保存都会把旧值写回去，出现「点了恢复默认却没重置」。现在点完弹窗立即关闭、期间的保存一律拒收，随后页面自动刷新。</p>
-    <p>仍需要刷新的只有「按发帖时间排序」（它要重新请求一个排好序的页面）和域名白名单（脚本启动时就定下来了）。</p>
-  </div>
-
-  <div class="card">
-    <h3>预览图可以调大小了</h3>
-    <p>新增「预览图数量」和「预览图高度」两个设置。前者控制标题下并排显示几张，后者控制单张图的高度（120–320）。嫌列表太挤就调矮一点、少放几张。</p>
-  </div>
-
-  <div class="card">
-    <h3>已读标记能自己配色</h3>
-    <p>已读行底色可以改，「已读加删除线」可以单独关掉。只在搜索结果页也一起跟随设置——之前那一页是写死的，设置改了它不认。</p>
-  </div>
-
-  <div class="card">
-    <h3>几个别扭的地方</h3>
-    <ul>
-      <li><b>打开头像设置不再全选「萌宝」</b>：以前一进弹窗，昵称框就是选中状态，打第一个字就把整段替换了。</li>
-      <li><b>拖头像松手不再弹图片窗口</b>：以前拖完在弹窗外松手，浏览器会按「拖入一张图片」新开一个窗口显示它。</li>
-      <li><b>设置弹窗窄了一点、控件靠右</b>：宽度 640 → 600，输入框和色块贴到右边界，第二列右边不再挂一大片空白。</li>
-      <li><b>头像弹窗定稿为 460px</b>（中途试过 548、500 两个宽度），九格间距拉开，昵称框与「萌宝」两个字高度对齐，删掉了多余的「面板头像设置」标题行。</li>
-      <li><b>评论面板的翻页栏加回「尾页」</b>：顺序是「页码框 / 总页数 · 上一页 · 下一页 · 尾页」，数字和斜杠之间也拉开了距离。</li>
-    </ul>
-  </div>
-
-  <div class="card">
-    <h3>支持在线更新了</h3>
-    <p>元数据里加了 <code>@updateURL</code> 和 <code>@downloadURL</code>，指向 jsDelivr 的地址。装上之后，脚本管理器可以自己检查新版本。</p>
-  </div>
-
+<details class="toc-mobile"><summary>本页目录</summary><nav aria-label="移动端目录"><ul class="toc-list"><li><a href="#g01">认识与安装</a></li>
+<li><a href="#g02">能力地图</a></li>
+<li><a href="#g03">页面支持</a></li>
+<li><a href="#g04">四个悬浮球</a></li>
+<li><a href="#g05">看图与画廊</a></li>
+<li><a href="#g06">详情页与评论</a></li>
+<li><a href="#g07">收藏馆与头像</a></li>
+<li><a href="#g08">设置项</a></li>
+<li><a href="#g09">账号与备份</a></li>
+<li><a href="#g10">现状与边界</a></li>
+<li><a href="#g11">常见问题</a></li></ul></nav></details>
+<div class="doc-layout">
+<main id="main"><section id="g01" class="doc-section"><div class="section-head"><span class="section-no">01</span><h2>认识与安装</h2></div>
+<p class="section-intro">萌宝小秘书是一份面向 Discuz 论坛的油猴脚本：把看图、翻页、过滤、收藏、评分和评论整理进同一套入口。数据保存在本地浏览器，不按“打开更多页面”来解决所有问题。</p>
+<div class="grid two">
+<div class="card"><h3>适合谁</h3><p>需要连续浏览帖子、集中看图、跟踪收藏用户，或减少重复翻页与筛选动作的论坛用户。</p></div>
+<div class="card"><h3>不需要学什么</h3><p>日常使用不需要读代码。先认四个球，再按页面支持矩阵判断哪个入口会出现即可。</p></div>
 </div>
-
-<div class="feature-section">
-  <h2 class="section-title">十一、1.3 → 1.4 有什么变化</h2>
-  <p class="section-intro">这一版开了个新开关、收了个旧账：给嫌 1200 太宽的人一个窄屏模式，把两个已读复选框合成了一个。</p>
-
-  <div class="card">
-    <h3>窄屏模式：版心能回到 960</h3>
-    <p>论坛的「窄」档现在就是 1200，3.4 时代的 960 已经回不去了。这版在设置里加了一个「窄屏模式」开关，默认关闭，想窄就自己窄。</p>
-    <p>它只作用于<strong>版块列表、导读、帖子、搜索页</strong>这四类用来阅读的页面。首页、个人中心设置、勋章、排行榜保持论坛原样——这几页内部有定宽组件（首页的门户幻灯片、双栏模板右栏固定 1010），压到 960 必然错位，与其修一半不如整体不动。</p>
-    <p>收窄的不是中间那一条：导航条、页头 logo、右上角用户信息、搜索栏、页脚边缘会一起收到 960，不会出现「正文窄了、页头还停在 1200」的错位。切到论坛的「全屏」档时自动放开，不用手动关。</p>
-  </div>
-
-  <div class="card">
-    <h3>已读标记合成一个下拉</h3>
-    <p>以前是「已读帖子标记」和「已读加删除线」两个复选框，能勾出「划线开着、标记却关着」这种其实什么都不会发生的组合。现在合成一个下拉：<strong>关闭 / 变灰划线 / 只变灰</strong>。</p>
-    <p>原来存的两个值会自动换算成新的三态，不用重新设置一遍。</p>
-  </div>
-
-  <div class="card">
-    <h3>几个小地方</h3>
-    <ul>
-      <li><b>增强球改近白</b>：默认色从偏灰改成 <code>#f8fafc</code>。没直接用纯白，是因为纯白会和论坛白底融成一片、只剩一圈细边框，认不出那是个球。</li>
-      <li><b>Vue 换生产版</b>：Console 里那条「development build」警告不再出现，每次加载也从约 500KB 降到约 140KB。<b>已经装过的需要卸载重装一次</b>——脚本管理器的 <code>@require</code> 有缓存。</li>
-      <li><b>设置弹窗控件对齐</b>：复选框原来贴标签左对齐、下拉框贴着右边界，一列里三种控件右边参差不齐。现在统一在标签右侧的剩余空间居中。</li>
-      <li><b>首次安装引导多了一行</b>：新装用户看到的引导卡里会说明窄屏模式。老用户不会重弹这张卡。</li>
-      <li><b>「新」角标</b>：设置里的「窄屏模式」挂了个「新」字，过了 11 月 24 日自动消失。</li>
-    </ul>
-  </div>
-
-  <div class="card">
-    <h3>修掉的几个 bug</h3>
-    <ul>
-      <li><b>「我的帖子 / 我的收藏」顶部多出来的星标</b>：那两页被误判成个人资料页，顶部的用户名旁边凭空挂了一个收藏星标。</li>
-      <li><b>窄屏时页头没跟着收</b>：logo 和右上角用户信息停在 1200 不动，跟收窄后的正文对不上。</li>
-      <li><b>保存窄屏后看不出生效没有</b>：以前 toast 只说「设置已保存」，现在会说明适用范围、以及当前这一页有没有生效。</li>
-    </ul>
-  </div>
-
+<p class="muted small">这份只讲怎么用。参数、版本与验收回执看《总纲》；为什么这么定、踩过哪些坑看《成长感悟复盘》。</p>
+<h3>安装与更新</h3>
+<ol class="steps">
+<li><b>准备用户脚本管理器。</b>使用支持 GM 存储与跨域请求能力的管理器，例如 Tampermonkey。直接把文件当普通网页 JavaScript 运行，不等同于安装油猴脚本。</li>
+<li><b>安装现役脚本。</b>通过项目仓库中的 <code>mengbao.user.js</code> 安装，或在管理器中新建脚本并粘贴完整源码。确认版本为 <code>1.7</code>（正式版）。</li>
+<li><b>检查站点白名单。</b>已预置 2 个论坛域名，只在这些域名下介入。若站点不在名单内，可通过管理器菜单添加；不要在不了解结构时把脚本放到所有网站运行。</li>
+<li><b>打开一个支持的版块列表。</b>确认悬浮球出现、看图能生成预览、设置保存后刷新仍保留，再开始使用。</li>
+<li><b>更新前导出配置。</b>覆盖安装同一份脚本通常可保留管理器中的数据，但换浏览器、换设备、清理站点数据或改变存储命名空间前，应先导出。</li>
+</ol>
+<p class="muted small">收藏、评分、已读和设置等数据保存在本地；脚本运行时可能按管理器规则加载已声明的依赖。</p>
+</section>
+<section id="g02" class="doc-section"><div class="section-head"><span class="section-no">02</span><h2>能力地图：先分球，再看全局</h2></div>
+<p class="section-intro">前四项是具体悬浮球能力，后两项是跨模块的全局行为。这样区分后，就不会去错误的页面找球，也不会把全局高亮当成某个球的开关。</p>
+<h3><span class="tag teal">球 · FAB</span> 四个常驻入口</h3>
+<div class="table-wrap"><table><colgroup><col style="width:15%"><col style="width:31%"><col style="width:27%"><col style="width:27%"></colgroup><thead><tr><th>入口</th><th>出现页面</th><th>左键</th><th>右键</th></tr></thead><tbody>
+<tr><td><b>看图球</b></td><td>版块列表、搜索、导读、空间收藏、用户主题</td><td>开启 / 停止持续看图；收起后用于展开预览</td><td>停止并收起预览，缓存保留</td></tr>
+<tr><td><b>翻页球</b></td><td>列表、搜索、导读、小黑屋、空间收藏、用户主题、用户回复</td><td>追加下一页</td><td>开启 / 停止持续翻页</td></tr>
+<tr><td><b>增强球</b></td><td>帖子详情页</td><td>画廊、收藏、评分及条件按钮</td><td>打开 / 关闭评论面板</td></tr>
+<tr><td><b>过滤球</b></td><td>搜索、导读</td><td>板块过滤</td><td>标题屏蔽词</td></tr>
+</tbody></table></div>
+<h3><span class="tag green">全局 · GLOBAL</span> 跨页面生效</h3>
+<div class="table-wrap"><table><colgroup><col style="width:22%"><col style="width:39%"><col style="width:39%"></colgroup><thead><tr><th>全局能力</th><th>主要作用范围</th><th>由什么控制</th></tr></thead><tbody>
+<tr><td><b>已读与收藏高亮</b></td><td>版块列表、搜索结果、用户主题等能识别帖子与作者的行</td><td>已读模式与底色、收藏高亮两色；收藏视觉优先</td></tr>
+<tr><td><b>外观与用户名跳转</b></td><td>版心宽度（全站），以及列表、楼层、评论中的用户名</td><td>宽版模式、画廊配色、右键跳转目标</td></tr>
+<tr><td><b>热度与已购</b></td><td>「我的帖子」与个人主题页的帖子行内，以及帖子详情页标题行的火焰图标后</td><td>通用设置「帖子热度与已购」开关；显示门槛与售卖帖判定见设置与边界一节</td></tr>
+</tbody></table></div>
+<div class="notice tip"><p class="notice-title">所有球都可拖动，吸附规则不完全相同</p><p>移动超过 3px 才视为拖拽，位置与折叠状态按账号保存。竖线吸附阈值为 10px：看图、翻页可主动对齐，过滤只作为对齐目标，增强不参与；吸附只调整横向位置。位置乱了可在设置中点“重置位置”。</p></div>
+</section>
+<section id="g03" class="doc-section"><div class="section-head"><span class="section-no">03</span><h2>页面支持矩阵</h2></div>
+<p class="section-intro">“能看到页面”不等于“脚本应主动介入”。下表按现役页面判定与模块入口整理。</p>
+<div class="table-wrap"><table><colgroup><col style="width:17%"><col style="width:10%"><col style="width:10%"><col style="width:10%"><col style="width:10%"><col style="width:10%"><col style="width:33%"></colgroup><thead><tr><th>页面</th><th>看图</th><th>翻页</th><th>过滤</th><th>详情增强</th><th>宽版</th><th>说明</th></tr></thead><tbody>
+<tr><td>版块列表</td><td>支持</td><td>支持</td><td>—</td><td>—</td><td>支持</td><td>已读与收藏高亮可按行处理</td></tr>
+<tr><td>搜索结果</td><td>支持</td><td>支持</td><td>支持</td><td>—</td><td>支持</td><td>可按板块与标题词过滤</td></tr>
+<tr><td>导读</td><td>支持</td><td>支持</td><td>支持</td><td>—</td><td>支持</td><td>过滤球与翻页球同时可用</td></tr>
+<tr><td>空间收藏</td><td>支持</td><td>支持</td><td>—</td><td>—</td><td>生效</td><td>同步论坛收藏状态</td></tr>
+<tr><td>用户主题</td><td>支持</td><td>支持</td><td>—</td><td>—</td><td>生效</td><td>已读与收藏高亮可按行处理</td></tr>
+<tr><td>用户回复</td><td>—</td><td>支持</td><td>—</td><td>—</td><td>生效</td><td>保留回复引用行，不按主题页处理</td></tr>
+<tr><td>小黑屋</td><td>—</td><td>支持</td><td>—</td><td>—</td><td>生效</td><td>只接管翻页</td></tr>
+<tr><td>帖子详情</td><td>点图画廊</td><td>论坛原分页 / 评论面板</td><td>—</td><td>支持</td><td>支持</td><td>增强球、收藏、评分、评论</td></tr>
+<tr><td>排行榜</td><td>—</td><td>—</td><td>—</td><td>—</td><td>生效</td><td>暂不介入；不提供排行榜版块筛选与行内热度</td></tr>
+<tr><td>首页、个人中心、勋章等</td><td>—</td><td>—</td><td>—</td><td>—</td><td>生效</td><td>不主动介入；版心仍按宽版设置</td></tr>
+</tbody></table></div>
+<p class="table-hint">宽版只改版心变量与一个 <code>html</code> class，全站生效；论坛切到全屏自适应档时自动放开，不覆盖。</p>
+<div class="notice note"><p class="notice-title">为什么列表页没有增强球</p><p>增强球只服务帖子详情；列表页的看图、翻页、过滤分别由自己的球承担。功能按目的归类，不按“这个按钮放在哪里”归类。</p></div>
+</section>
+<section id="g04" class="doc-section"><div class="section-head"><span class="section-no">04</span><h2>四个悬浮球：操作与状态</h2></div>
+<h3>默认位置</h3>
+<p>四个球直径均为 <b>44px</b>，默认左边距 <b>24px</b>；自下而上的默认底边距离为：翻页 <b>200px</b>、看图 <b>280px</b>、增强 <b>360px</b>、过滤 <b>720px</b>。它们只在各自目标页面出现。</p>
+<div class="grid two">
+<div class="card"><h3>翻页球</h3><p><b>左键</b>加载一页，内容追加而不整页刷新；<b>右键</b>按设定延时持续加载，再右键停止。</p><p>列表页底部的论坛原生「下一页」按钮也被接管：点击不再整页跳转，改走同一加载逻辑，加载后地址栏页码与按钮的 <code>curpage</code> 同步。</p><p>球下标签显示<b>这次翻到了第几页</b>：从进入时的页码起算，追加成功一页加一；失败、一行没追加、手动跳页都不计数，刷新后从当前页重算。它不读论坛的总页数。</p><p class="muted small">只走真实的下一页链接；分页被重绘后会重新定位，不把伪链当目标。</p></div>
+<div class="card"><h3>看图球</h3><p><b>左键</b>开启持续看图，再左键停止；<b>右键</b>停止并收起。收起后再左键只展开预览，不会自动重启持续加载。</p><p class="muted small">翻页新增的帖子会由观察器补入当前持续轮次；每轮重新计算进度与停滞时间。</p></div>
+<div class="card"><h3>增强球</h3><p><b>左键</b>打开详情功能面板；<b>右键</b>切换评论面板。</p><p class="muted small">购买、回复、链接与附件按钮按帖子实际内容生成；找不到可见目标时不应硬造入口。</p></div>
+<div class="card"><h3>过滤球</h3><p><b>左键</b>打开板块面板：左键条目隐藏，右键条目只看该板块；只看可叠加多个板块。<b>右键球</b>编辑标题规则。面板条目名称在左、计数胶囊贴右，两端对齐；长板块名自动省略。</p><p class="muted small">被隐藏板块不再抓图预览，减少无效请求。过滤配置按账号保存。</p></div>
 </div>
-
-<div class="feature-section">
-  <h2 class="section-title">十二、1.4 → 1.5 有什么变化</h2>
-  <p class="section-intro">这一版主要在收口：换机、换版本时那份配置备份终于能用了，资料页的收藏星标回到了它该在的位置，几处会误导人的提示也改了口径。</p>
-
-  <div class="card">
-    <h3>旧版导出的配置能导进来了</h3>
-    <p>以前用 1.0 导出的备份，粘进新版导入框会被整批拦下，提示「检测到无法识别的配置项」。原因有两个：1.0 的导出会把没设置过的项也写成空值，新版把这些空值当成坏键；收藏用户的排序表特意做成「按登录账号分开存」的结构，新版又不认识这种形状。</p>
-    <p>现在两类都能过——空值直接跳过、不参与校验，排序表的旧结构也认。导入完会告诉你导进了几项、忽略了几个已经下线的旧设置（内置头像、评论面板收藏这类）。</p>
-  </div>
-
-  <div class="card">
-    <h3>导出的文件更干净了</h3>
-    <p>以前导出的 JSON 里一堆「键存在、值是空」的项，看着像配了几十项，实际大半没设过。现在只写真正设置过的项。</p>
-    <p>弹窗也把范围说清楚了：<strong>不含悬浮球位置、看图临时缓存与已读历史</strong>。这三样本来就不进备份，写出来是为了避免「导出等于全备份」的误解。</p>
-  </div>
-
-  <div class="card">
-    <h3>资料页的收藏星标回到头像旁</h3>
-    <p>有一段时间，别人资料页上的收藏星标看着像不见了。不是没挂，是挂错了地方：落到「统计信息 好友数 / 回帖数」那一行的小字里，灰色空心小星夹在小字中间，等于隐形。</p>
-    <p>现在挂回资料页顶部的用户名栏，也就是头像右侧那一块——1.0 到 1.2 一直挂在这里。找不到才退回到正文里的用户名链接。</p>
-  </div>
-
-  <div class="card">
-    <h3>评论面板的总页数不再跟着离谱</h3>
-    <p>偶尔会碰到论坛分页显示「/ 548368 页」这种数字，一帖明明只有几十条回复。脚本现在认一个必然成立的判断：<strong>页数不可能超过回复数</strong>，因为每页至少有一楼。超过就按回复数重算，所以真实存在的大帖（比如两千条回复）不会被误伤。</p>
-    <p>触发时脚本会把原始值、帖子编号和回复数记在本机，不进配置、也不进备份，下次再出现能回头查。</p>
-  </div>
-
-  <div class="card">
-    <h3>权限不够的帖子不再反复重试</h3>
-    <p>阅读权限不足的帖子，脚本抓不到正文，会显示「⚠️ 未找到帖子内容 [重试]」。以前它会自己反复重试，一直在刷。现在失败一次就停在那儿，想再试就点旁边的 [重试]。</p>
-  </div>
-
-  <div class="card">
-    <h3>几个说清楚的地方</h3>
-    <ul>
-      <li><b>关于入口</b>：通用设置的标题行多了「ℹ️ 关于」，能看版本、作者、仓库和指南地址。脚本管理器的菜单项也带上了版本号。</li>
-      <li><b>大图提示</b>：「放大后可拖动」原来在缩放后面单独列着，现在并成一句「Ctrl+滚轮缩放（放大后可拖动）」，意思更连贯。</li>
-      <li><b>白名单保存提示</b>：补了「其它已打开的页面也要刷新」——白名单在页面加载时读取，只刷当前这一页，别的标签页还是旧的。</li>
-      <li><b>窄屏模式说明</b>：把适用范围写进了提示里，省得每次翻指南。</li>
-      <li><b>收藏提示</b>：从「收藏成功」改成「已收藏该帖」，明确是帖子还是用户。</li>
-    </ul>
-  </div>
-
-  <div class="card">
-    <h3>1.5 还修了这几处</h3>
-    <p>都不改功能，只是把细节修顺。</p>
-    <ul>
-      <li><b>用户主题页 / 回复页也能收藏了</b>：这两类地址里带 <code>view=me</code>，之前被当成「自己的列表页」直接跳过，星标不出现。现在带 uid 的 <code>view=me</code> 认作对方的空间页，星标挂在顶部用户名旁。</li>
-      <li><b>收藏后名字会变蓝</b>：以前只有星标变实心、用户名不变色。现在帖子楼层、评论侧栏、版块列表、搜索结果都能正确高亮，评论面板滚动加载出来的评论也一样。</li>
-      <li><b>楼层跳转不再被顶部条压住</b>：评论面板点「跳转」后，目标楼层会被顶部红条盖住一截。现在按顶部条的实际高度让位，头像和用户名完整露出来。</li>
-      <li><b>看图进度不再出现「278/270」</b>：分子和分母口径统一了，完成数按帖子去重，分母取实时识别到的帖子数，不会再出现分子比总数大。</li>
-      <li><b>手动点过论坛的「下一页」也能继续翻</b>：论坛自己翻页后会把「下一页」链接换成伪地址，脚本照旧去请求就会报「连接被中断」。现在先找真正的下一页地址，找不到就按页码往后推，确实到末页才停。</li>
-    </ul>
-  </div>
+<h3>标题屏蔽词：每行一条</h3>
+<div class="table-wrap"><table><colgroup><col style="width:20%"><col style="width:43%"><col style="width:37%"></colgroup><thead><tr><th>写法</th><th>含义</th><th>示例与边界</th></tr></thead><tbody>
+<tr><td><code>广告</code></td><td>标题包含该文字就隐藏</td><td>普通包含匹配</td></tr>
+<tr><td><code>=求资源</code></td><td>标题完全相等才隐藏</td><td>适合精确标题，不做模糊扩展</td></tr>
+<tr><td><code>/公告/</code></td><td>按正则匹配，忽略大小写</td><td>非法正则被忽略并报告，其余规则照常</td></tr>
+<tr><td><code>!置顶</code></td><td>排除规则，命中后不隐藏</td><td>优先于隐藏规则，用于抵消误杀</td></tr>
+</tbody></table></div>
+<p>带板块 ID 的页面可选择“仅过滤当前板块”；否则规则全局生效。保存立即重排，取消不写入。</p>
+</section>
+<section id="g05" class="doc-section"><div class="section-head"><span class="section-no">05</span><h2>看图与画廊</h2></div>
+<h3>列表预览带</h3>
+<ul>
+<li>每帖默认先显示 <b>3 张</b>，可设 <b>1–12 张</b>；更多图片通过末尾“+”进入画廊。</li>
+<li>缩略图高度默认 <b>200px</b>，可设 <b>120–320px</b>；尚未展开时，执行代码使用的起点高度是 <b>120px</b>。</li>
+<li>滚动前会提前取图；抓页请求走同一个全局请求池（并发 4、间隔 80ms、同地址 60 秒内复用），当前帖优先于翻页与热度。</li>
+<li><b>持久化缓存上限 4000 帖</b>；页面上已渲染的预览块上限 3200 个；超出后淘汰最旧的，滚回去不用重新请求帖子。预览缓存只是提速，不是长期备份。</li>
+</ul>
+<h3>异常图如何处理</h3>
+<div class="table-wrap"><table><colgroup><col style="width:25%"><col style="width:39%"><col style="width:36%"></colgroup><thead><tr><th>情况</th><th>脚本处理</th><th>用户看到什么</th></tr></thead><tbody>
+<tr><td>整帖图片首次全失败</td><td>等待 1 秒后自动重载一次，每帖仅一次</td><td>若恢复，不弹错误；仍全挂才出现一行提示</td></tr>
+<tr><td>部分图片失败</td><td>移除未解码成功的图，不影响同帖其他图</td><td>成功图片继续显示</td></tr>
+<tr><td>真挂图持续探测</td><td>窗口上限 180 秒</td><td>超窗后给“原帖图片加载失败”和“重试”</td></tr>
+<tr><td>帖子本来没图</td><td>不进入无意义重试</td><td>显示无图提示</td></tr>
+</tbody></table></div>
+<h3>画廊与单图</h3>
+<ul>
+<li>画廊网格常规为 5 列，窗口变窄时依次降为 3 列、2 列；背景与卡片色可在设置中调整。</li>
+<li>滚轮切换图片，<kbd>Ctrl</kbd> + 滚轮缩放；缩放范围 <b>0.3×–5×</b>，放大后可拖动平移。</li>
+<li>支持顺时针 90° 旋转、底部缩略条定位；<kbd>Esc</kbd> 关闭画廊，双击图片或点击规定的空白 / 顶栏区域退出单图。</li>
+<li>图片加载超过 <b>3 秒</b>才显示慢加载提示，避免正常图片也频繁闪状态。</li>
+</ul>
+</section>
+<section id="g06" class="doc-section"><div class="section-head"><span class="section-no">06</span><h2>帖子详情、评分与评论</h2></div>
+<h3>增强功能面板</h3>
+<p>画廊、收藏与评分是固定入口；购买、回复、链接、附件等按当前帖子条件出现。“收藏帖子”与作者名旁的“收藏用户”是两套数据，不要混用。收藏结果按论坛真实返回判定，成功、已收藏、失败会分别提示，不一律报成功。</p>
+<div class="notice tip"><p class="notice-title">评分会预填各评分项上限</p><p>点击评分会打开论坛原生窗口，读取各评分项上限并预填；一旦用户手动改分，后续补写立即停止。提交仍由论坛原生窗口完成，脚本接管成功 / 失败回调并记录状态。</p></div>
+<h3>评论面板</h3>
+<ul>
+<li>右键增强球打开或关闭；面板可翻页、跳页、加载后续评论。</li>
+<li>默认宽度 <b>24%</b>，范围 <b>15%–50%</b>；最小字数默认 <b>1</b>，范围 <b>1–30</b>，两项均按账号保存。</li>
+<li>评论正文、头像、楼层、时间和跳转链接按真实返回渲染；长度过滤会显示被过滤条数。</li>
+<li>面板中的用户名右键跳转与全局“右键点击用户名”设置一致；选“关闭”时交还原生菜单。</li>
+</ul>
+<div class="notice note"><p class="notice-title">详情页没有看图球</p><p>正文图片点击后直接进入本帖画廊；增强球负责打开完整功能面板。两条入口目标不同，不互相替代。</p></div>
+</section>
+<section id="g07" class="doc-section"><div class="section-head"><span class="section-no">07</span><h2>收藏馆、头像与昵称</h2></div>
+<h3>收藏馆只管理“人”</h3>
+<ul>
+<li>从设置中的收藏馆入口打开；显示当前账号的用户数与分组数。</li>
+<li>拖动用户胶囊可排序，拖到分组标签可归组；“全部”和“未分组”是内置视图，不按普通分组删除。</li>
+<li>编辑模式支持全选、批量移组、批量取消收藏；删除有确认，不可撤销。</li>
+<li>自定义分组可新建、改名、删除；重名会被拒绝，删除分组后组内用户回到未分组。</li>
+<li>收藏馆底部“导出 / 导入”只处理收藏用户与分组，不等于全量配置备份。</li>
+</ul>
+<h3>头像与昵称</h3>
+<ul>
+<li>头像设置同时服务评论面板和收藏馆；昵称用于面板标题与提示。</li>
+<li>最多保存 <b>9 个</b>自定义头像，可拖拽调整位置；本地上传单图超过 <b>5MB</b> 会被拒绝。</li>
+<li>上传时压缩到 256px 保存。</li>
+<li>抓取头像会按候选地址依次尝试，并设置请求超时，避免单个地址挂起。</li>
+<li>头像库本身不纳入全量导出，重要图片请自行保留原文件。</li>
+</ul>
+</section>
+<section id="g08" class="doc-section"><div class="section-head"><span class="section-no">08</span><h2>设置项：默认值与生效时机</h2></div>
+<p class="section-intro">入口：油猴管理器菜单 →“设置（v1.7）”。设置弹窗分为通用 7 项、看图 6 项，以及收藏馆入口。</p>
+<h3>通用设置（7 项）</h3>
+<div class="table-wrap"><table><colgroup><col style="width:22%"><col style="width:24%"><col style="width:31%"><col style="width:23%"></colgroup><thead><tr><th>设置</th><th>默认 / 范围</th><th>作用</th><th>生效时机</th></tr></thead><tbody>
+<tr><td>宽版模式</td><td>默认勾选（1200）</td><td>勾选 = 版心 1200，还原论坛旧版宽度，全站生效；不勾选 = 跟随论坛当前的 960 窄档</td><td>立即；建议刷新重排</td></tr>
+<tr><td>已读帖子</td><td>加底色 + 划线</td><td>关闭 / 加底色 + 划线 / 只加底色；关闭也停止新记录；记录上限 3200 条</td><td>立即</td></tr>
+<tr><td>已读帖子底色</td><td><code>#f0f0f0</code></td><td>未收藏的已读帖整行底色；与收藏高亮同时命中时以收藏高亮优先</td><td>立即</td></tr>
+<tr><td>帖子热度与已购</td><td>默认开启</td><td>在「我的帖子」与个人主题页的标题右侧显示热度与购买人数，进详情页时标题行火焰后也直接出数；未达门槛的帖子不显示，购买数只有标价出售的帖子才有；关闭后不逐帖请求、也不显示</td><td>立即</td></tr>
+<tr><td>按发帖时间排序</td><td>默认开启</td><td>通过 URL 参数按发帖时间倒序</td><td>刷新后</td></tr>
+<tr><td>翻页延时</td><td>5 秒，0–10</td><td>持续翻页每页之间的等待</td><td>下一次调度</td></tr>
+<tr><td>右键点击用户名</td><td>个人资料</td><td>资料 / 主题 / 回复 / 关闭</td><td>下一次右键</td></tr>
+</tbody></table></div>
+<h3>萌宝看图（6 项）</h3>
+<div class="table-wrap"><table><colgroup><col style="width:25%"><col style="width:25%"><col style="width:30%"><col style="width:20%"></colgroup><thead><tr><th>设置</th><th>默认 / 范围</th><th>作用</th><th>生效时机</th></tr></thead><tbody>
+<tr><td>画廊背景色</td><td><code>#faf8f5</code></td><td>网格整体背景</td><td>立即</td></tr>
+<tr><td>画廊卡片色</td><td><code>#f8fafc</code></td><td>图片卡片底色</td><td>立即</td></tr>
+<tr><td>收藏高亮背景</td><td><code>#dbeafe</code></td><td>收藏用户发帖的行底色</td><td>立即</td></tr>
+<tr><td>收藏高亮标题</td><td><code>#d97706</code></td><td>收藏用户发帖的标题色</td><td>立即</td></tr>
+<tr><td>预览图数量</td><td>3，1–12</td><td>每帖预览带初始图片数</td><td>后续渲染</td></tr>
+<tr><td>预览图高度</td><td>200px，120–320</td><td>预览缩略图高度</td><td>后续渲染</td></tr>
+</tbody></table></div>
+<p class="table-hint">“后续渲染”指已画好的预览带不会逐格重排；刷新、翻页或重新生成预览后按新值执行。</p>
+</section>
+<section id="g09" class="doc-section"><div class="section-head"><span class="section-no">09</span><h2>多账号、备份、导入与恢复默认</h2></div>
+<h3>哪些数据按账号分桶</h3>
+<p>收藏帖、收藏用户 / 分组 / 顺序、评分、已读、头像与昵称、评论面板宽度和最小字数、四球位置与折叠状态、过滤配置，以及配色、预览数量与高度、排序、已读开关与底色、翻页延时、跳转目标等个人设置，均按账号保存。白名单、调试开关、看图预览缓存与内部状态不随账号分桶。</p>
+<div class="notice tip"><p class="notice-title">账号识别不止一种方式</p><p>脚本结合页面 UID、个人入口与域名映射识别账号；无法确认时使用 guest 桶，并保留后续重新解析机会。UID 映射用于跨页面衔接，恢复默认时保留。</p></div>
+<h3>全量导出实际包含什么</h3>
+<div class="grid two">
+<div class="card"><h3>包含</h3><ul><li>通用与看图设置</li><li>收藏帖、评分、收藏用户 / 分组 / 顺序</li><li>白名单</li><li>四球位置与折叠状态</li><li>已读历史</li><li>面板选择、昵称等已登记备份的设置项</li></ul></div>
+<div class="card"><h3>不包含</h3><ul><li>自定义头像库</li><li>看图预览缓存</li><li>未登记为备份键的临时界面状态</li></ul><p class="muted small">只导出真正设置过的值，不为空键写一串 null。</p></div>
 </div>
+<h3>导入与恢复默认</h3>
+<ul>
+<li><b>同账号导入：</b>按设置规则校验并合并覆盖；未知键或非法值会触发整批回滚，旧版明确下线的键则忽略。</li>
+<li><b>跨账号导入：</b>跳过收藏帖、评分和已读历史，其余通过校验的设置可写入当前账号或全局存储，避免把原账号状态串过来。</li>
+<li><b>恢复默认：</b>保留站点白名单与 UID 映射；账号分桶数据只删除当前账号桶，不清空其他账号。完成后自动刷新。</li>
+<li><b>清除缓存 / 重置位置：</b>分别只处理预览缓存和四球位置，不等于恢复默认。</li>
+</ul>
+</section>
+<section id="g10" class="doc-section"><div class="section-head"><span class="section-no">10</span><h2>现役现状与使用边界</h2></div>
+<p class="section-intro">这一节列出使用中值得提前知道的边界，以及仍需要真实现场才能继续判断的事项。</p>
+<h3>其他应知道的边界</h3>
+<ul>
+<li>脚本只针对当前站点维护，选择器按该站实测 DOM 确定，不承诺兼容其他 Discuz 论坛；白名单可以添加别的域名，但换站后功能是否可用需重新验证。</li>
+<li>详情页若返回明显异常的总页数，目前只有按回复数重算的兜底，原始异常根因仍需真实现场。</li>
+<li>图床连接重置或 HTTP/2 协议错误可能自动恢复，所以首次全挂不等于图片永久失效。</li>
+<li>翻页追加、窗口重新聚焦、标签页重新可见及 <code>pageshow</code> 恢复时，都会尝试补标已读。</li>
+<li>热度与已购进页时逐帖取一次，一页约几秒；热度不到显示门槛的帖子不显示，购买数只有标价出售的帖子才有；后台有短时间软缓存，不会每次进页都重复请求。详情页取不到时会重试一次；旧记录缺的字段会被新值补齐。已判「已购 0」的售卖帖停留本页不会自动刷新数字，需刷新页面、翻页或重进后才重新抓取。详情页标题行的标签与列表同源，进帖即出数，不再额外发请求。</li>
 
-<div class="feature-section">
-  <h2 class="section-title">十三、1.5 → 1.6 有什么变化</h2>
-  <p class="section-intro">这一版主要在收尾：几个会互相打架的地方理顺了。白名单不再是「填错就回默认」的死胡同，重置也不会再把你的站点一起清掉。</p>
-
-  <div class="card">
-    <h3>整帖图片全挂，会先自己重连一次</h3>
-    <p>图床偶尔抽风，几张图一起失败，控制台里报的是连接被重置——地址本身没问题，重连一下常常就回来了。以前一挂就弹「原帖图片加载失败 [重试]」，得你手动点。</p>
-    <p>现在先自动重连一次，恢复就直接出图、什么提示都不弹；重连完还是全挂，才给失败提示和重试按钮。每帖只自动重试一次，不会一直刷。</p>
-  </div>
-
-  <div class="card">
-    <h3>「重置」不再连同白名单一起清掉</h3>
-    <p>以前点「恢复默认」，白名单会被整个删掉、回落到内置的五个域名。如果你的站点不在那五个里，重置完脚本在页面上就完全不动作，看着像坏了。</p>
-    <p>现在白名单单独留着，其它设置照常清空。代价是「恢复默认」不再是最彻底的那种重置，但不会把你自己的站点弄丢。</p>
-  </div>
-
-  <div class="card">
-    <h3>白名单里乱填，不会再被当成「清空」</h3>
-    <p>以前在白名单框里填汉字、或者手滑带上端口号，保存之后名单静默变回默认，提示还写着「已保存」。现在是拒绝保存并指出哪几行不对，原来的名单一个字都不动。</p>
-  </div>
-
-  <div class="card">
-    <h3>白名单入口不绑当前站点</h3>
-    <p>油猴菜单里的「🌐 白名单管理」现在不依赖你正打开的是哪个站。人在任何网页上都能打开它把域名加进去，不用先跑到那个论坛才能操作。</p>
-  </div>
-
-  <div class="card">
-    <h3>两个脚本抢排序参数，不再互相弹</h3>
-    <p>同一个论坛上如果还装了别的脚本、它也在改排序参数，两边会互相把对方弹回原来的地址，页面就一直在刷新。现在脚本看一眼「这一跳是从哪儿来的」：如果是刚被弹回来的，就收手并提示，其它情况照常跳。</p>
-  </div>
-
-  <div class="card">
-    <h3>预览块的两处观感</h3>
-    <ul>
-      <li><b>展开更早了</b>：以前等图片下载完才撑开，现在浏览器一解出尺寸就撑开，起点高度也从 44 抬到 120px，不会只露一条缝。</li>
-      <li><b>占位块看得见了</b>：浅灰底上加了一层细内描边，能看出那是个框，不是一片灰砖。</li>
-    </ul>
-  </div>
-
-  <div class="card">
-    <h3>1.6 还修了这几处</h3>
-    <ul>
-      <li><b>预览块图片一直不出</b>：服务端给的是相对地址，取链时却优先选中了它，拼不出完整网址。现在只认绝对地址，实在都是相对的就用同帖的域名补。</li>
-      <li><b>慢图上来之后条带不展开</b>：原来只等 30 秒，现在放宽到 180 秒，每帖各算各的。</li>
-      <li><b>「恢复默认」把别的账号也清了</b>：账号数据以前没先解析就判断，判断一直失败，最后退化成整个清空。</li>
-      <li><b>点帖子图片退回论坛原生看图</b>：接管点击的代码排在太后面，前面步骤一中断就整段跳过。</li>
-      <li><b>单图加载层的三点被压扁</b>：三点和「正在加载」挤在一行，改上下两行。</li>
-      <li><b>自动翻页追加的页面不标已读</b>；右键打开帖子也不记账，现在都补上了。</li>
-      <li><b>论坛翻页后脚本报错</b>：分页区重绘会把「下一页」链接冲掉，兜底逻辑找到的是 javascript:; 这种假地址，请求必然失败。现在用当前网址自己拼下一页。</li>
-      <li><b>页码读不准</b>：以前只认一种写法，伪静态页读不到，改成多级回退。</li>
-      <li><b>限流时只报「网络错误」</b>：现在能认出论坛的提示页，按它给的时间等。</li>
-      <li><b>原帖图失效时提示太吓人</b>：以前像整页坏了，现在整帖全挂压成一行说明，部分失败只删失败的格子。</li>
-    </ul>
-  </div>
+</ul>
+</section>
+<section id="g11" class="doc-section"><div class="section-head"><span class="section-no">11</span><h2>常见问题</h2></div>
+<dl class="defs">
+<div><dt>球一个也没出现</dt><dd>先核对域名白名单与页面支持矩阵，再确认管理器已启用脚本。首页、个人中心等页面本来就不会主动出现球。</dd></div>
+<div><dt>只看到部分球</dt><dd>这是正常行为。过滤球只在搜索 / 导读，增强球只在详情页，其余页面按矩阵出现。</dd></div>
+<div><dt>翻页提示不是列表或需要登录</dt><dd>脚本会区分列表响应、论坛提示页与限流页。先确认登录状态，再适当增大翻页延时；不要把所有非 200 或 200 提示页都当末页。</dd></div>
+<div><dt>持续翻页被限流</dt><dd>脚本会读取论坛提示与 <code>Retry-After</code>。连续限流时停止并调大延时，比反复手动重试更安全。</dd></div>
+<div><dt>整帖图片全挂</dt><dd>先让自动重载完成；仍失败再点该帖“重试”，清除该帖缓存并重新抓取。旧帖图链确实失效时，重试也不能恢复原图。</dd></div>
+<div><dt>设置改了但预览没变</dt><dd>预览数量 / 高度作用于后续渲染。刷新或继续翻页后再看；配色、已读与宽版则按表中的时机生效。</dd></div>
+<div><dt>换账号后数据不对</dt><dd>先确认页面已识别到 UID，不要急于反复导入。跨账号导入会跳过收藏、评分和已读；其余数据按分桶规则读取。</dd></div>
+<div><dt>准备换浏览器</dt><dd>先导出全量配置，并单独导出收藏馆名单；头像库和预览缓存不在全量导出中，重要头像原图另行保存。</dd></div>
+<div><dt>热度 / 购买数没显示</dt><dd>先确认设置里「帖子热度与已购」已开启；刚进页需逐帖取数，等几秒再看。热度不到门槛的帖子不显示，非标价出售的帖子没有购买数；被屏蔽或只看过滤掉的行不进取数队列。已判「已购 0」的帖停在本页不会自动变，刷新、翻页或重进后才重抓。</dd></div>
+<div><dt>需要排查日志</dt><dd>在设置中开启“调试日志”，复现问题后查看控制台。截图适合确认视觉状态，文本日志与真实 DOM / 返回适合确认数据。</dd></div>
+</dl>
+</section><div id="noResults" class="no-results">没有匹配的章节。可换个关键词，或点“清空”查看全文。</div></main>
+<aside class="toc-desktop" aria-label="桌面端目录"><p class="toc-title">本页目录</p><nav><ul class="toc-list"><li><a href="#g01">认识与安装</a></li>
+<li><a href="#g02">能力地图</a></li>
+<li><a href="#g03">页面支持</a></li>
+<li><a href="#g04">四个悬浮球</a></li>
+<li><a href="#g05">看图与画廊</a></li>
+<li><a href="#g06">详情页与评论</a></li>
+<li><a href="#g07">收藏馆与头像</a></li>
+<li><a href="#g08">设置项</a></li>
+<li><a href="#g09">账号与备份</a></li>
+<li><a href="#g10">现状与边界</a></li>
+<li><a href="#g11">常见问题</a></li></ul></nav></aside>
 </div>
-
-<div class="footer">
-  萌宝小秘书 · 新手使用指南 v1.6<br>
-  对应脚本 1.6
+<footer class="footer"><p>萌宝小秘书 · 独立自包含文档 · CSS 与交互脚本均内嵌，无外部资源。</p><p>正式版 v1.7 · 7,609 行 / 471,709 B · MD5: 37c0b133a023e5186741254c95065f7f</p></footer>
 </div>
+<button id="backTop" class="backtop" type="button" aria-label="返回顶部" title="返回顶部">↑</button>
+<script>
+(function(){
+  const sections=Array.from(document.querySelectorAll('.doc-section'));
+  const links=Array.from(document.querySelectorAll('.toc-list a'));
+  const input=document.getElementById('docSearch');
+  const count=document.getElementById('searchCount');
+  const empty=document.getElementById('noResults');
+  function filterSections(){
+    const q=(input.value||'').trim().toLocaleLowerCase();let visible=0;
+    sections.forEach(sec=>{
+      const hit=!q||sec.textContent.toLocaleLowerCase().includes(q);
+      sec.hidden=!hit;if(hit)visible++;
+      links.filter(a=>a.getAttribute('href')==='#'+sec.id).forEach(a=>{a.parentElement.hidden=!hit;});
+    });
+    count.textContent=q?visible+' / '+sections.length:sections.length+' 节';
+    empty.classList.toggle('show',visible===0);
+  }
+  input.addEventListener('input',filterSections);filterSections();
+  document.getElementById('clearSearch').addEventListener('click',()=>{input.value='';filterSections();input.focus();});
+  document.getElementById('printDoc').addEventListener('click',()=>window.print());
+  const top=document.getElementById('backTop');
+  top.addEventListener('click',()=>window.scrollTo({top:0,behavior:'smooth'}));
+  function onScroll(){top.classList.toggle('show',window.scrollY>700);}window.addEventListener('scroll',onScroll,{passive:true});onScroll();
+  if('IntersectionObserver' in window){
+    const observer=new IntersectionObserver(entries=>{
+      const current=entries.filter(e=>e.isIntersecting).sort((a,b)=>a.boundingClientRect.top-b.boundingClientRect.top)[0];
+      if(!current)return;links.forEach(a=>a.classList.toggle('active',a.getAttribute('href')==='#'+current.target.id));
+    },{rootMargin:'-8% 0px -70% 0px',threshold:0});sections.forEach(s=>observer.observe(s));
+  }
+})();
+</script>
 </body>
 </html>
