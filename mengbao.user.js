@@ -5,11 +5,11 @@
 // 功能：图片画廊预览、搜索过滤、自动翻页、收藏用户与帖子、
 //       评论侧边面板、浏览历史标记、自定义头像、按时间排序
 // ============================================================
-// 版本：1.7
+// 版本：1.8
 // ==UserScript==
 // @name         萌宝小秘书
 // @namespace    https://violentmonkey.mengbao.local/
-// @version      1.7
+// @version      1.8
 // @updateURL    https://cdn.jsdelivr.net/gh/mengbao-tools/mengbao-xiaomishu@main/mengbao.user.js
 // @downloadURL  https://cdn.jsdelivr.net/gh/mengbao-tools/mengbao-xiaomishu@main/mengbao.user.js
 // @description  Discuz 论坛增强套件：图片画廊预览、大图查看器、搜索过滤、自动翻页、收藏用户与帖子、评论侧边面板、评分自动满分、浏览历史标记、自定义头像
@@ -120,6 +120,8 @@
         'mengbao.browse.strike':             { type: 'boolean',  def: true, backup: true },
         'mengbao.page.width':               { type: 'number',   def: 1200, min: 960, max: 1200, backup: true, validate: vOldOrNew(function (x) { return typeof x === 'number' && [960, 1200].indexOf(x) !== -1; }) },
         'mengbao.owner.meta':               { type: 'object',   def: {}, backup: false },
+        'mengbao.rank.filter.hide':         { type: 'object', def: {}, backup: false, validate: vOldOrNew(x => !!x && typeof x === 'object' && !Array.isArray(x) && Object.values(x).every(a => Array.isArray(a) && a.every(v => typeof v === 'string'))) },
+        'mengbao.rank.filter.only':         { type: 'object', def: {}, backup: false, validate: vOldOrNew(x => !!x && typeof x === 'object' && !Array.isArray(x) && Object.values(x).every(a => Array.isArray(a) && a.every(v => typeof v === 'string'))) },
         'mengbao.owner.metaEnabled':        { type: 'boolean',  def: true, backup: true },
         'mengbao.jump_target':               { type: 'enum',     def: 'home', values: ['home', 'thread', 'reply', 'off'], backup: true },
         'mengbao.favorite_highlight_bg':     { type: 'color',    def: '#dbeafe', backup: true },
@@ -584,34 +586,67 @@
             } catch (e) { return null; }
         },
         sleep(ms) { return new Promise(r => setTimeout(r, ms)); },
+        // 图片地址可用性判定：把站点自己写的「缺图占位」挡在采集阶段
+        //   实测占位：http://MISSING_P20.gif（主机名不存在，DNS 直接失败）
+        //   以及：static/image/common/none.gif（站点图片加载失败后的替换图）
+        _isUsableImgUrl(u) {
+            if (!u) return false;
+            const t = String(u).trim();
+            if (!/^https?:\/\//i.test(t)) return false;
+            if (/missing_/i.test(t)) return false;
+            if (/\/static\/image\/common\/none\.(gif|png)/i.test(t)) return false;
+            return true;
+        },
+        // 从一组节点里找绝对图床 origin（预览和画廊共用同一套解析规则）
+        resolveImageOrigin(nodes) {
+            let origin = '';
+            (nodes || []).forEach((el) => {
+                if (origin) return;
+                ['zoomfile', 'file', 'src'].forEach((attr) => {
+                    if (origin) return;
+                    const v = el.getAttribute(attr);
+                    if (v && /^https?:\/\//i.test(v) && !/\/static\/image\/common\/none\.(gif|png)/i.test(v)) origin = v.replace(/^(https?:\/\/[^/]+).*/i, '$1');
+                });
+            });
+            return origin;
+        },
+        // 规则：绝对 zoomfile > 绝对 file > 绝对 src > 相对路径按同帖图床补全。
+        // 服务端原始 HTML 里 zoomfile 可能是相对路径；直接取会在本站域名下 404。
+        resolveImgUrl(el, origin) {
+            if (!el) return '';
+            const zf = el.getAttribute('zoomfile');
+            const f = el.getAttribute('file');
+            const s = el.getAttribute('src');
+            const abs = (v) => !!v && /^https?:\/\//i.test(v);
+            if (abs(zf)) return this._isUsableImgUrl(zf) ? zf : '';
+            if (abs(f)) return this._isUsableImgUrl(f) ? f : '';
+            if (abs(s) && !/\/static\/image\/common\/none\.(gif|png)/i.test(s)) return this._isUsableImgUrl(s) ? s : '';
+            // 只有 src 且是论坛占位 none.gif 时不算图片，避免把「暂无图」解析成一张灰图
+            const sUsable = s && !/\/static\/image\/common\/none\.(gif|png)/i.test(s);
+            const raw = zf || f || (sUsable ? s : '') || '';
+            if (!raw) return '';
+            if (/missing_/i.test(raw)) return '';
+            if (/^\/\//.test(raw)) {
+                const u = location.protocol + raw;
+                return this._isUsableImgUrl(u) ? u : '';
+            }
+            const host = origin || this.resolveImageOrigin([el]);
+            if (host) {
+                const u = host + '/' + raw.replace(/^\.?\//, '');
+                return this._isUsableImgUrl(u) ? u : '';
+            }
+            try {
+                const u = new URL(raw, location.href).href;
+                return this._isUsableImgUrl(u) ? u : '';
+            } catch (e) {
+                return '';
+            }
+        },
         extractImages(root) {
             if (!root) return [];
             const nodes = this.extractImageNodes(root);
-            // 服务端原始 HTML 里 zoomfile 常是相对路径（upian/forum/2026/11/x.jpg），由前端脚本在运行时补成绝对。
-            // 直接取 zoomfile 会拿到不带域名的地址，浏览器按本站域名解析后 404 —— 这是预览块"图永远不出来"的一类主因。
-            // 先收同帖出现过的绝对地址域名，供纯相对路径补全。
-            let origin = '';
-            nodes.forEach(el => {
-                if (origin) return;
-                ['zoomfile', 'file', 'src'].forEach(attr => {
-                    if (origin) return;
-                    const v = el.getAttribute(attr);
-                    if (v && /^https?:\/\//i.test(v)) origin = v.replace(/^(https?:\/\/[^/]+).*/i, '$1');
-                });
-            });
-            return nodes.map(el => {
-                const zf = el.getAttribute('zoomfile');
-                const f = el.getAttribute('file');
-                const s = el.getAttribute('src');
-                const abs = v => !!v && /^https?:\/\//i.test(v);
-                if (abs(zf)) return zf;
-                if (abs(f)) return f;
-                if (abs(s) && !/\/static\/image\/common\/none\.(gif|png)/i.test(s)) return s;
-                const raw = zf || f || s || '';
-                if (!raw) return '';
-                if (origin) return origin + '/' + raw.replace(/^\.?\//, '');
-                try { return new URL(raw, location.href).href; } catch (e) { return ''; }
-            }).filter(Boolean);
+            const origin = this.resolveImageOrigin(nodes);
+            return nodes.map((el) => this.resolveImgUrl(el, origin)).filter(Boolean);
         },
         extractImageNodes(root) {
             if (!root) return [];
@@ -852,6 +887,25 @@
     function isThreadPage(url) { return /mod=viewthread/.test(url || location.href) || /thread-\d+(-\d+)*\.html/.test(url || location.href); }
     function isSpaceThreadPage(url) { return /mod=space.*do=thread.*view=me(?!.*type=reply)/.test(url || location.href); }
     function isSpaceReplyPage(url) { return /mod=space.*do=thread.*type=reply/.test(url || location.href); }
+    // 帖子排行榜页：misc.php?mod=ranklist&type=thread。版块榜（type=forum）不在范围内。
+    function isRanklistPage(url) {
+        const u = url || location.href;
+        if (!/misc\.php/.test(u)) return false;
+        if (!/[?&]mod=ranklist/.test(u)) return false;
+        return /[?&]type=thread(&|$)/.test(u);
+    }
+    // 榜单表格：无 id 也无 class，只能靠「tr.th 里带 td.frm」反查（实测结构）。
+    // 版块筛选与看图球共用这一个入口，避免两处各自找表、日后漂移。
+    function findRankTable() {
+        const heads = document.querySelectorAll('tr.th');
+        for (let i = 0; i < heads.length; i++) {
+            if (heads[i].querySelector('td.frm')) {
+                const t = heads[i].closest('table');
+                if (t) return t;
+            }
+        }
+        return null;
+    }
     function isSpaceFavPage(url) {
         const u = url || location.href;
         return u.includes('mod=space') && u.includes('do=favorite');
@@ -918,6 +972,9 @@
             --mb-accent-soft:#eef4ff; --mb-accent-deep:#1d6fd1; --mb-accent-line:#d6e4ff;
             --mb-accent-soft-hover:#ddeeff;
             --mb-text-muted:#666;
+            --mb-text-strong:#333;
+            /* 排行榜表头暖米（模块专属，集中管理不换色） */
+            --mb-rank-th-bg:#efe4cd; --mb-rank-th-border:#d9c9a3; --mb-rank-th-color:#6b5b3a;
             --mb-text-primary:#222; --mb-text-hint:#999;
             --mb-bg-page:#fff; --mb-bg-secondary:#f0f0f0; --mb-border:#e5e7eb; --mb-disabled-hover:#d1d5db;
             --mb-text-on-accent:#fff;
@@ -1202,6 +1259,76 @@
         .mb-guolv-item.mb-only .mb-guolv-count { background:rgba(255,255,255,0.25); color:var(--mb-text-on-accent); }
         .mb-guolv-count { display:inline-flex;align-items:center;justify-content:center;min-width:20px;width:20px;height:20px;padding:0 2px;background:var(--mb-accent-soft,#eef2ff);color:var(--mb-accent-deep,#1d4ed8);border-radius:var(--mb-radius-pill);font-size:var(--mb-font-sm);font-weight:600; }
         .mb-guolv-grid .mb-guolv-item.mb-hidden .mb-guolv-count { background:var(--mb-bg-secondary);color:var(--mb-text-muted); }
+
+        /* 排行榜页：版块筛选条（贴在榜单表格上方，见 moduleRankFilter）
+           外观与站点原生控件一致：白底、1px 浅边、13px 字，与表头行之间靠边框分开，不粘连；
+           版块多时 chips 区 flex-wrap 换行，计数始终留在第一排右端。
+           外层卡片（站点排行榜容器）已自带边框与内边距，筛选条不再自建外框，只在下沿留一条分隔线 */
+        .mb-rank-filter {
+            position:relative;
+            display:flex;
+            align-items:center;
+            flex-wrap:wrap;
+            gap:6px;
+            margin:0;
+            padding:6px 0;
+            background:transparent;
+            border:0;
+            border-bottom:1px solid var(--mb-border);
+            border-radius:0;
+            font-size:var(--mb-font-md);
+            color:var(--mb-text-muted);
+        }
+        .mb-rank-filter > label {
+            flex:none;
+            line-height:26px;
+            font-weight:600;
+            color:var(--mb-text-strong);
+        }
+        .mb-rank-filter-chips {
+            display:flex;
+            flex:1 1 auto;
+            flex-wrap:wrap;
+            gap:6px;
+            min-width:0;
+        }
+        /* chip 复用过滤器面板 .mb-guolv-item 基样式与 .mb-hidden/.mb-only 状态类；
+           这里只保留排行榜特有约束：不参与收缩、名称可截断、计数允许三位数 */
+        .mb-rank-chip {
+            flex:0 0 auto;
+            max-width:100%;
+        }
+        .mb-rank-chip .mb-guolv-count {
+            width:auto;
+            min-width:20px;
+            padding:0 4px;
+        }
+        .mb-rank-chip-t { max-width:9em; overflow:hidden; text-overflow:ellipsis; }
+        /* 被屏蔽时计数胶囊跟着一起灰掉 */
+        .mb-rank-chip.mb-hidden .mb-guolv-count { background:var(--mb-bg-secondary); color:var(--mb-text-muted); }
+        /* 表格只归零外边距：不画框、不铺任何底色，帖子行（含交替底色、已读灰）完全保持站点原样 */
+        .mb-rank-table {
+            margin:0 !important;
+        }
+        /* 表头行不是帖子行，单独上暖米底；下边线加粗到 2px，与已读行灰底色靠色相 + 硬边界区分 */
+        .mb-rank-table tr.th {
+            background:var(--mb-rank-th-bg) !important;
+        }
+        /* 下边线必须同时落在 th 与 td 上：表头行里只有「主题」是 th，其余是 td.frm/td.by/td */
+        .mb-rank-table tr.th th,
+        .mb-rank-table tr.th td {
+            border-bottom:2px solid var(--mb-rank-th-border) !important;
+        }
+        .mb-rank-table tr.th th {
+            font-weight:600 !important;
+            color:var(--mb-rank-th-color) !important;
+        }
+        /* 表头行不参与 hover 变色：站点原生 tr:hover 会给单元格刷灰底，把暖米盖掉；帖子行一行都不碰 */
+        .mb-rank-table tr.th:hover,
+        .mb-rank-table tr.th:hover th,
+        .mb-rank-table tr.th:hover td {
+            background:var(--mb-rank-th-bg) !important;
+        }
         .mb-modal-mask { position:fixed;inset:0;background:rgba(0,0,0,0.35);z-index:var(--mb-z-modal);display:flex;align-items:center;justify-content:center; }
         .mb-modal-box { box-sizing:border-box;background:var(--mb-bg-page);border-radius:var(--mb-radius);padding:var(--mb-modal-padding);box-shadow:var(--mb-shadow-sm);max-width:92%;max-height:92vh;overflow-y:auto;overflow-x:hidden;font-family:Tahoma, Helvetica, "Microsoft Yahei", sans-serif; }
         .mb-modal-box--sm { width:var(--mb-dialog-width-sm); }
@@ -2051,9 +2178,36 @@
             });
         },
 
+        _normImgUrl(u) {
+            if (!u) return '';
+            return String(u).split('#')[0].replace(/[?&]_mb_[^&]*/g, '').replace(/[?&]$/, '');
+        },
+        // 收集当前页面里已经解码完成的图（跳过画廊自身），供画廊与大图复用
+        _collectLoadedImages() {
+            const map = new Map();
+            try {
+                document.querySelectorAll('img').forEach((el) => {
+                    if (el.closest && el.closest('.mb-gallery-mask')) return;
+                    if (!el.complete || !el.naturalWidth) return;
+                    const key = this._normImgUrl(el.currentSrc || el.src);
+                    if (key && !map.has(key)) map.set(key, el);
+                });
+            } catch (e) {}
+            this._loadedImgMap = map;
+            return map;
+        },
+        _findLoadedImg(url) {
+            const map = this._loadedImgMap;
+            if (!map || !map.size) return null;
+            const el = map.get(this._normImgUrl(url));
+            if (el && el.isConnected && el.complete && el.naturalWidth > 0) return el;
+            return null;
+        },
+
         open(imgArr, startIndex, postTitle, imgRefs, mainCount, direct, originImg, fromThread) {
             if (!imgArr || imgArr.length === 0) return null;
             mainCount = mainCount || 0;
+            this._reuseLogged = false; // 每次开画廊都允许打一条复用统计
             const replyCount = imgArr.length - mainCount;
             this._closeExisting();
             this._lockScroll();
@@ -2144,8 +2298,13 @@
                     loading.style.display = 'none';
                     if (failEl) failEl.style.display = 'block';
                 };
-                newImg.src = curUrl;
-                if (newImg.complete && newImg.naturalWidth > 0) {
+                // 正文里已解码的同一张直接复用，不再 newImg 发请求；角标、resetView、缩略条定位照常执行
+                const reusedImg = this._findLoadedImg(curUrl);
+                if (reusedImg) showLoaded();
+                else newImg.src = curUrl;
+                if (reusedImg) {
+                    // 复用已出图：不发请求、不起慢加载提示，直接落到尾部定位逻辑
+                } else if (newImg.complete && newImg.naturalWidth > 0) {
                     showLoaded();          // 已缓存：同一帧内直接呈现，不露转圈
                 } else {
                     loading.style.display = 'block';
@@ -2280,6 +2439,8 @@
             const cellObjs = [];
             // 等下一帧渲染 mask 后再填充 grid，避免阻塞首帧绘制
             requestAnimationFrame(() => {
+                const pageLoaded = this._collectLoadedImages();
+                let reuseHits = 0;
                 const fragment = document.createDocumentFragment();
                 imgArr.forEach((url, idx) => {
                     if (idx === mainCount && replyCount > 0) {
@@ -2366,14 +2527,20 @@
                         showSingle(idx); 
                     };
                     fragment.appendChild(cell);
-                    cellObjs.push({ cell, gImg, url, settle, startSpin });
+                    cellObjs.push({ cell, gImg, url, settle, startSpin, reuseEl: pageLoaded.get(this._normImgUrl(url)) || null });
                 });
                 grid.appendChild(fragment);
                 // 用 requestIdleCallback 低优先级串行预加载剩余全部图，滚到即看
                 const loadOne = (obj) => {
                     if (!obj || obj.gImg.src) return;
-                    if (obj.startSpin) obj.startSpin();
-                    obj.gImg.src = obj.url;
+                    // 正文里同一张已解码完成就借它的地址，同 URL 命中内存缓存，不再回源发 304
+                    if (obj.reuseEl && obj.reuseEl.isConnected && obj.reuseEl.complete && obj.reuseEl.naturalWidth > 0) {
+                        reuseHits++;
+                        obj.gImg.src = obj.reuseEl.currentSrc || obj.reuseEl.src;
+                    } else {
+                        obj.gImg.src = obj.url;
+                        if (obj.startSpin) obj.startSpin();
+                    }
                     // 已缓存的图设完 src 就能同步拿到尺寸，直接同帧收掉加载态
                     const trySettle = () => { if (obj.gImg.complete && obj.gImg.naturalWidth > 0) obj.settle(); };
                     trySettle();
@@ -2402,6 +2569,10 @@
                         if (!obj.gImg.src) { loadOne(obj); break; }
                     }
                     if (i < cellObjs.length) ric(pump);
+                    if (!this._reuseLogged) {
+                        this._reuseLogged = true;
+                        if (reuseHits) Util.log('debug', '画廊复用正文已加载图', { hit: reuseHits, total: imgArr.length });
+                    }
                 };
                 ric(pump);
             }, 16);
@@ -2690,6 +2861,14 @@
             else if (isSearchResultPage(url)) { this.genericListScan(['.common.xi2', '.se_ThreadList', '.tl']); count = this._lastScanCount; }
             else if (isSpaceThreadPage(url) || isSpaceReplyPage(url)) { this.genericListScan(['.tl', '.threadlist', '.bm_c']); count = this._lastScanCount; }
             else if (isGuidePage(url)) { this.genericListScan(['.tl', '.threadlist', '.bm_c']); count = this._lastScanCount; }
+            else if (isRanklistPage(url)) {
+                // 榜单表没有 class，直接传元素；找不到就返回 0，绝不退化成 document.body 全站扫
+                const rt = findRankTable();
+                if (rt) {
+                    this.genericListScan([rt]);
+                    count = this._lastScanCount;
+                }
+            }
             return count;
         },
         removeStickyAndAds() {
@@ -2757,6 +2936,9 @@
                 }
                 if (!a.innerText || a.innerText.trim().length < 2) return;
                 if (a.closest('.tbm, .hm, .pg, #header, #footer, .pn')) return;
+                // 排行榜被版块筛选藏掉的行不再入队，否则筛完还在拉别的版块的图
+                const preRow = a.closest('li, dl, div.item, div.threadlist, div.thread, tr');
+                if (preRow && preRow.style && preRow.style.display === 'none') return;
                 seen.add(tid);
                 const title = a.innerText.trim().slice(0, 80) || '图片预览';
                 if (!this._countedTids.has(tid)) { this._countedTids.add(tid); count++; }
@@ -2776,7 +2958,11 @@
         _syncRowHidden(anchor, wrap, tid) {
             try {
                 const hidden = Mengbao.Guolv && typeof Mengbao.Guolv.isTidHidden === 'function' && Mengbao.Guolv.isTidHidden(tid);
-                if (hidden) wrap.style.display = 'none';
+                // 排行榜版块筛选：显隐权归筛选模块，这里只查询、不自行点亮，否则持续加载重扫会把已藏预览重新显形
+                const rf = Mengbao.RankFilter;
+                const rankHidden = !!(rf && typeof rf.isRowHidden === 'function' && rf.isRowHidden(anchor));
+                if (hidden || rankHidden) wrap.style.display = 'none';
+                else if (rf && typeof rf.isFilterActive === 'function' && rf.isFilterActive()) wrap.style.display = '';
             } catch (e) {}
         },
         renderCachedPreview(anchor, tid, postTitle, imgs) {
@@ -3131,7 +3317,7 @@
         },
         _startListObserver() {
             if (this._listObserver) return;
-            const root = document.querySelector('#threadlist') || document.querySelector('.bm_c') || document;
+            const root = document.querySelector('#threadlist') || document.querySelector('.bm_c') || (isRanklistPage(location.href) && findRankTable()) || document;
             this._listObserver = new MutationObserver(() => {
                 if (!this._continuous || this._stopped) return;
                 if (this._obsTimer) clearTimeout(this._obsTimer);
@@ -3274,7 +3460,7 @@
             const url = location.href;
             if (/[?&]type=reply\b/.test(url)) return false;
             if (isDarkroomPage(url)) return false;
-            return isForumListPage(url) || isSpaceFavPage(url) || isSearchResultPage(url) || isGuidePage(url) || isSpaceThreadPage(url);
+            return isForumListPage(url) || isSpaceFavPage(url) || isSearchResultPage(url) || isGuidePage(url) || isSpaceThreadPage(url) || isRanklistPage(url);
         }
     };
 
@@ -4162,6 +4348,335 @@
                 modal.close();
             };
         }
+    };
+
+    // ===================== 排行榜版块筛选 =====================
+    // 实测结构（misc.php?mod=ranklist&type=thread，2026-11-16 取的真实 DOM）：
+    //   榜单 table 无 id 也无 class，靠「tr.th 里带 td.frm」的表头行反查；
+    //   表头 5 格依次是 td.icn（空） / th「主题」 / td.frm「版块」 / td.by「作者」 / td「回复」；
+    //   数据行 tr 无 class，序号写在 td.icn 里是纯文本；版块格里是 a[href*="forumdisplay&fid="]。
+    // 因此按 fid 作筛选键（版块可改名、可重名），按列位取单元格（五种榜单列名不同但列位一致）。
+    // 只做显示/隐藏：序号保留它在总榜的真实名次，不做重编号，也不动任何行内容。
+    const moduleRankFilter = Mengbao.RankFilter = {
+        _built: false,
+        _bar: null,
+        _rows: [],
+        _table: null,
+        _hide: null, // 被屏蔽的版块集合（黑名单）；空集 = 全部显示
+        _only: null, // 右键「只看」的 fid 集合，可同时多个；非空时优先于 _hide
+        _mo: null,
+        _moTimer: null,
+        _previewHidden: null,
+        isTargetPage() {
+            return isRanklistPage();
+        },
+        // 找榜单表：统一走 findRankTable()，与看图球共用同一份判定
+        findTable() {
+            return findRankTable();
+        },
+        // 当前榜单分类桶：view（榜单类型）+ orderby（时段）组合，不同分类各自记忆、互不串
+        _scopeKey() {
+            let view = '-', orderby = '-';
+            try {
+                const p = new URLSearchParams(location.search);
+                view = p.get('view') || '-';
+                orderby = p.get('orderby') || '-';
+            } catch (e) {}
+            return view + '|' + orderby;
+        },
+        // 读某键的分类 map；旧版一维数组是未分桶历史数据，首次读到时挂到当前分类桶并回写
+        _readBucket(key) {
+            const v = Util.userStore.get(key, {});
+            if (Array.isArray(v)) {
+                const map = { [this._scopeKey()]: v.filter((x) => typeof x === 'string') };
+                Util.userStore.set(key, map);
+                return map;
+            }
+            return (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};
+        },
+        _writeBucket(key, arr) {
+            const map = this._readBucket(key);
+            const k = this._scopeKey();
+            if (arr && arr.length) map[k] = arr;
+            else delete map[k];
+            Util.userStore.set(key, map);
+        },
+        // 当前分类桶里的屏蔽 fid 集合（黑名单）；空集 = 全部显示
+        savedHide(allFids) {
+            try {
+                const v = this._readBucket('mengbao.rank.filter.hide')[this._scopeKey()];
+                return Array.isArray(v) ? v.filter((x) => typeof x === 'string') : [];
+            } catch (e) {
+                return [];
+            }
+        },
+        saveHide() {
+            try {
+                this._writeBucket('mengbao.rank.filter.hide', this._hide ? Array.from(this._hide) : []);
+            } catch (e) {}
+        },
+        // 「只看」单独存一份：只靠「隐藏补集」倒推的话，多个版块同时只看时分不清谁被点亮
+        savedOnly(allFids) {
+            try {
+                const v = this._readBucket('mengbao.rank.filter.only')[this._scopeKey()];
+                const arr = Array.isArray(v) ? v.filter((x) => typeof x === 'string') : [];
+                return arr.filter((f) => allFids.indexOf(f) >= 0);
+            } catch (e) {
+                return [];
+            }
+        },
+        saveOnly() {
+            try {
+                this._writeBucket('mengbao.rank.filter.only', this._only ? Array.from(this._only) : []);
+            } catch (e) {}
+        },
+        // 供看图球查询：显隐的最终裁决权在筛选这边，看图模块只读不自行点亮
+        isFilterActive() {
+            return !!((this._only && this._only.size) || (this._hide && this._hide.size));
+        },
+        isRowHidden(row) {
+            if (!this.isFilterActive() || !row || !this._table) return false;
+            let el = row;
+            // 调用方可能传 tbody / 包裹节点，往上找到表格内的那一行
+            while (el && el !== this._table && el.tagName !== 'TR') el = el.parentElement;
+            if (!el || el.tagName !== 'TR') return false;
+            return el.style.display === 'none';
+        },
+        build(table) {
+            const headTr = table.querySelector('tr.th');
+            if (!headTr) return;
+            const frmCell = headTr.querySelector('td.frm');
+            const col = [].indexOf.call(headTr.cells, frmCell);
+            if (col < 0) return;
+
+            const rows = [];
+            for (let i = 0; i < table.rows.length; i++) {
+                const tr = table.rows[i];
+                if (tr === headTr || tr.classList.contains('th')) continue;
+                const cell = tr.cells[col];
+                if (!cell) continue;
+                const a = cell.querySelector('a[href*="fid="]');
+                if (!a) continue; // 没有版块链接的行（异常行）不参与
+                const m = (a.getAttribute('href') || '').match(/[?&]fid=(\d+)/);
+                const fid = m ? m[1] : '';
+                const name = (a.textContent || '').replace(/\s+/g, ' ').trim() || '版块 ' + fid;
+                // 顺手记 tid：筛选后要按 tid 同步隐藏看图球插进来的预览行
+                const titleA = tr.querySelector('th a[href*="tid="], th a[href*="thread-"], a[href*="viewthread"]');
+                const tm = titleA ? (titleA.getAttribute('href') || '').match(/[?&]tid=(\d+)/) || (titleA.getAttribute('href') || '').match(/thread-(\d+)/) : null;
+                const tid = tm ? tm[1] : '';
+                rows.push({ tr: tr, fid: fid, name: name, tid: tid });
+            }
+            if (!rows.length) return;
+            this._rows = rows;
+            this._table = table;
+            // 标记类：表头配色与合框样式只作用在排行榜这张表，不波及其它页面的原生表格
+            table.classList.add('mb-rank-table');
+            this.watch(table);
+
+            // 按 fid 聚合：同一版块在榜里可能占很多条
+            const stat = {};
+            rows.forEach((r) => {
+                const k = r.fid;
+                if (!stat[k]) stat[k] = { fid: k, name: r.name, n: 0 };
+                stat[k].n++;
+            });
+            const items = Object.keys(stat)
+                .map((k) => stat[k])
+                .sort((x, y) => y.n - x.n);
+            // 还原上次的筛选：只认本次榜单里仍存在的 fid，换榜后消失的版块自动忽略。
+            // 「只看某个版块」在数据层就是「隐藏其余全部」，所以刷新后能由 hide 集合直接推导回来
+            const allFids = items.map((it) => it.fid);
+            this._hide = new Set(this.savedHide(allFids).filter((f) => allFids.indexOf(f) >= 0));
+            this._only = new Set(this.savedOnly(allFids));
+            this.render(table, items);
+        },
+        render(table, items) {
+            if (this._bar) this._bar.remove();
+            const bar = document.createElement('div');
+            bar.className = 'mb-rank-filter';
+            const label = document.createElement('label');
+            label.textContent = '版块筛选：';
+            const chips = document.createElement('div');
+            chips.className = 'mb-rank-filter-chips';
+            chips.title = '左键：过滤该版块（灰底划线）· 右键：只看该版块（蓝底），再右键同一个退回全部。序号保留它在总榜里的真实名次';
+            const mkChip = (fid, name, n, tip) => {
+                const chip = document.createElement('span');
+                // 视觉全部继承过滤器面板：基样式 mb-guolv-item，状态用 mb-hidden / mb-only
+                chip.className = 'mb-guolv-item mb-rank-chip';
+                chip.dataset.fid = fid;
+                chip.title = tip;
+                const t = document.createElement('span');
+                t.className = 'mb-rank-chip-t';
+                t.textContent = name;
+                const c = document.createElement('span');
+                c.className = 'mb-guolv-count';
+                c.textContent = String(n);
+                chip.appendChild(t);
+                chip.appendChild(c);
+                chips.appendChild(chip);
+                return chip;
+            };
+            mkChip('', '全部', this._rows.length, '清空所有筛选，显示全部版块');
+            items.forEach((it) => mkChip(it.fid, it.name, it.n, '左键：过滤「' + it.name + '」· 右键：只看「' + it.name + '」'));
+            bar.appendChild(label);
+            bar.appendChild(chips);
+            if (table.parentNode) table.parentNode.insertBefore(bar, table);
+            this._bar = bar;
+
+            // 左键 = 屏蔽该版块（与过滤球一致）；右键 = 只看该版块，再右键同一个退回全部
+            chips.addEventListener('click', (e) => {
+                const chip = e.target && e.target.closest ? e.target.closest('.mb-rank-chip') : null;
+                if (!chip) return;
+                const fid = chip.dataset.fid;
+                if (!fid) {
+                    this._hide.clear();
+                    this._only.clear();
+                } else {
+                    // 从左键进入屏蔽前，若当前是「只看」状态，先退回全显示，
+                    // 否则 hide 里还留着「除 X 之外全部」，再点一下会得到反直觉的结果
+                    if (this._only && this._only.size) {
+                        this._only.clear();
+                        this._hide.clear();
+                        this.saveOnly();
+                    }
+                    if (this._hide.has(fid)) this._hide.delete(fid);
+                    else this._hide.add(fid);
+                }
+                this.paintChips();
+                this.apply();
+                this.saveHide();
+            });
+            chips.addEventListener('contextmenu', (e) => {
+                const chip = e.target && e.target.closest ? e.target.closest('.mb-rank-chip') : null;
+                if (!chip) return;
+                e.preventDefault();
+                e.stopPropagation();
+                const fid = chip.dataset.fid;
+                if (!fid) {
+                    this._hide.clear();
+                    this._only.clear();
+                    this.paintChips();
+                    this.apply();
+                    this.saveHide();
+                    this.saveOnly();
+                } else {
+                    this.toggleOnly(fid);
+                }
+            });
+
+            this.paintChips();
+            if (this.isFilterActive()) this.apply();
+        },
+        // 只改高亮，不动行：恢复上次选择时无需重跑一遍筛选
+        // mb-hidden = 被屏蔽（灰底划线），mb-only = 只看中的那个（蓝底白字），与过滤球同一套类
+        paintChips() {
+            if (!this._bar) return;
+            const hide = this._hide || new Set();
+            const only = this._only || new Set();
+            [].slice.call(this._bar.querySelectorAll('.mb-rank-chip')).forEach((chip) => {
+                const fid = chip.dataset.fid;
+                const isAll = !fid;
+                chip.classList.toggle('mb-only', isAll ? !only.size && !hide.size : only.has(fid));
+                chip.classList.toggle('mb-hidden', isAll ? false : !only.size && hide.has(fid));
+            });
+        },
+        // 右键只看：每点一下切换该版块的点亮状态，可以同时只看多个；点掉最后一个即恢复全部
+        toggleOnly(fid) {
+            const names = {};
+            (this._rows || []).forEach((r) => {
+                if (r.fid) names[r.fid] = r.name;
+            });
+            if (!this._only) this._only = new Set();
+            if (this._only.has(fid)) this._only.delete(fid);
+            else this._only.add(fid);
+            if (this._only.size) {
+                // 只看非空时，隐藏集合就是「其余全部」，与显示结果严格一致
+                this._hide = new Set(Object.keys(names).filter((f) => !this._only.has(f)));
+                Util.toast(
+                    this._only.size === 1
+                        ? '只看「' + (names[fid] || fid) + '」，其余版块已隐藏'
+                        : '只看 ' + this._only.size + ' 个版块，其余已隐藏',
+                    1800,
+                    'success'
+                );
+            } else {
+                this._hide.clear();
+                Util.toast('已退出只看，恢复全部显示', 1500, 'success');
+            }
+            this.paintChips();
+            this.apply();
+            this.saveHide();
+            this.saveOnly();
+        },
+        apply() {
+            const only = this._only || new Set();
+            const hide = this._hide || new Set();
+            const active = !!(only.size || hide.size);
+            // 回到「全部」：先把因筛选被藏起来的预览行还原，再逐行恢复
+            if (!active && this._previewHidden) {
+                this._previewHidden.forEach((pv) => {
+                    if (pv.parentNode) pv.style.display = '';
+                });
+                this._previewHidden.clear();
+            }
+            this._rows.forEach((r) => {
+                let keep;
+                if (only.size) keep = only.has(r.fid);
+                else if (hide.size) keep = !hide.has(r.fid);
+                else keep = true;
+                r.tr.style.display = keep ? '' : 'none';
+            });
+            this.syncPreviews();
+        },
+        // 看图球的预览行是独立 tr（插在所属帖子行之后，id = mb-kantu-<tid>）。
+        // 筛掉一个帖子时必须连它的预览行一起藏，否则列表里会留下无主的图片块。
+        // 只在筛选生效时动手：未筛选时碰它们会覆盖看图模块自己的折叠/失败态。
+        syncPreviews() {
+            if (!this._table || !this.isFilterActive()) return;
+            if (!this._previewHidden) this._previewHidden = new Set();
+            // 看图球的预览行一律插在所属帖子行之后，直接看前一个兄弟节点即可判断归属，
+            // 不依赖行里能否解析出 tid（榜单标题有伪静态等写法，靠 tid 反查会漏）
+            const bodies = this._table.tBodies;
+            for (let b = 0; b < bodies.length; b++) {
+                const rows = bodies[b].rows;
+                for (let i = 0; i < rows.length; i++) {
+                    const tr = rows[i];
+                    if (!tr.id || tr.id.indexOf(CONST.PREVIEW_ID_PREFIX) !== 0) continue;
+                    const prev = tr.previousElementSibling;
+                    if (!prev) continue;
+                    if (prev.style.display === 'none') {
+                        tr.style.display = 'none';
+                        this._previewHidden.add(tr);
+                    } else if (this._previewHidden.has(tr)) {
+                        tr.style.display = '';
+                        this._previewHidden.delete(tr);
+                    }
+                }
+            }
+        },
+        // 筛选状态下新加载出来的预览行也要跟上（看图球是异步往表里插行的）
+        watch(table) {
+            if (this._mo || typeof MutationObserver === 'undefined') return;
+            this._mo = new MutationObserver(() => {
+                if (this._moTimer) return;
+                this._moTimer = setTimeout(() => {
+                    this._moTimer = null;
+                    this.syncPreviews();
+                }, 200);
+            });
+            this._mo.observe(table, { childList: true, subtree: true });
+        },
+        init() {
+            try {
+                if (!this.isTargetPage() || this._built) return;
+                const table = this.findTable();
+                if (!table) return; // 找不到带 td.frm 的表头就不动手，绝不塞进错的列
+                this._built = true;
+                this.build(table);
+            } catch (e) {
+                Util.log('error', '排行榜筛选初始化失败：', e);
+            }
+        },
     };
 
     // ===================== 模块五：萌宝增强 =====================
@@ -6409,8 +6924,7 @@
         _dirty: false,
         _flushTimer: null,
         isTargetPage() {
-            // 排行榜页的热度随排行榜筛选一起留到 1.8，这里只认「我的帖子」与个人主题页
-            return isSpaceThreadPage();
+            return isSpaceThreadPage() || isRanklistPage();
         },
         data() {
             if (this._data) return this._data;
@@ -6714,7 +7228,15 @@
             else subject.insertAdjacentElement('afterend', span);
         },
         collectRows() {
-            // 表头行有 .th、看图球插的预览行没有 th，都能被 titleAnchor 过滤掉
+            // 排行榜：榜单表无 id 无 class，改走共用找表；表头行有 .th、看图球插的预览行没有 th，都能被 titleAnchor 过滤掉
+            if (isRanklistPage()) {
+                const t = findRankTable();
+                if (!t) return [];
+                return [].slice.call(t.rows).filter((row) => {
+                    if (row.classList.contains('th')) return false;
+                    return !!this.titleAnchor(row);
+                });
+            }
             return [].slice.call(document.querySelectorAll('#ct .tl tbody tr, #ct table.tl tbody tr')).filter((row) => {
                 if (row.classList.contains('th')) return false;
                 return !!this.titleAnchor(row);
@@ -6820,7 +7342,7 @@
         // 可见优先：长列表一次可能上百行，先跑视口上下各一屏，首屏落地后再按批补剩余，
         // 不监听滚动（滚到哪都已经是现成的），避免首屏被上百个请求挤到队尾
         startVisibleFirst(rows) {
-            if (rows.length < 20) {
+            if (!isRanklistPage() || rows.length < 20) {
                 rows.forEach((row) => this.startRow(row));
                 return;
             }
@@ -7028,6 +7550,7 @@
                 if (moduleOwnerMeta.isTargetPage()) moduleOwnerMeta.init();
                 else if (isThreadPage()) moduleOwnerMeta.writeBackFromThread();
             }],
+            ['排行榜筛选', () => { if (moduleRankFilter.isTargetPage()) moduleRankFilter.init(); }],
             ['浏览历史', () => {
                 if (isThreadPage()) {
                     // 开关关闭时完全不记账（设置「已读帖子」选「关闭」）

@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#0f6b6d">
-<meta name="description" content="萌宝小秘书 v1.7 使用指南：安装、页面支持、四个悬浮球、看图翻页过滤、详情增强、收藏馆、设置、多账号与全量配置导入导出。">
-<title>萌宝小秘书 · 使用指南 v1.7</title>
+<meta name="description" content="萌宝小秘书 v1.8 使用指南：安装、页面支持、四个悬浮球、看图翻页过滤、详情增强、收藏馆、设置、多账号与全量配置导入导出。">
+<title>萌宝小秘书 · 使用指南 v1.8</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230f6b6d'/%3E%3Cpath d='M17 43V21h7l8 11 8-11h7v22h-7V31l-8 10-8-10v12z' fill='white'/%3E%3C/svg%3E">
 <style>
 :root{
@@ -79,10 +79,10 @@ details.fold{margin:12px 0;border:1px solid var(--line);border-radius:8px;backgr
 <body>
 <div class="wrap">
 <header class="masthead">
-  <p class="eyebrow">使用指南 · 正式版 v1.7</p>
+  <p class="eyebrow">使用指南 · 正式版 v1.8</p>
   <h1>萌宝小秘书 · 使用指南</h1>
   <div class="lede">从“我在哪个页面”出发，找到正确的球与全局设置。<strong>先分清入口，再理解数据边界</strong>，比背下一整页按钮更有用。</div>
-  <dl class="meta"><div><dt>对应脚本</dt><dd>v1.7 正式版 · 7,609 行</dd></div><div><dt>版本状态</dt><dd>正式版 · 已过真机验收</dd></div><div><dt>常驻入口</dt><dd>四个球 · 按页面出现</dd></div><div><dt>设置结构</dt><dd>通用 7 项 · 看图 6 项</dd></div><div><dt>数据位置</dt><dd>本地浏览器 · 按账号分桶</dd></div></dl>
+  <dl class="meta"><div><dt>对应脚本</dt><dd>v1.8 正式版 · 8,132 行</dd></div><div><dt>版本状态</dt><dd>正式版 · 已过真机验收</dd></div><div><dt>常驻入口</dt><dd>四个球 · 按页面出现</dd></div><div><dt>设置结构</dt><dd>通用 7 项 · 看图 6 项</dd></div><div><dt>数据位置</dt><dd>本地浏览器 · 按账号分桶</dd></div></dl>
 </header>
 <div class="toolbar" role="search">
   <div class="search"><input id="docSearch" type="search" placeholder="查找功能或关键词" aria-label="查找本页内容"><span id="searchCount" class="search-count" aria-live="polite"></span></div>
@@ -110,7 +110,7 @@ details.fold{margin:12px 0;border:1px solid var(--line);border-radius:8px;backgr
 <h3>安装与更新</h3>
 <ol class="steps">
 <li><b>准备用户脚本管理器。</b>使用支持 GM 存储与跨域请求能力的管理器，例如 Tampermonkey。直接把文件当普通网页 JavaScript 运行，不等同于安装油猴脚本。</li>
-<li><b>安装现役脚本。</b>通过项目仓库中的 <code>mengbao.user.js</code> 安装，或在管理器中新建脚本并粘贴完整源码。确认版本为 <code>1.7</code>（正式版）。</li>
+<li><b>安装现役脚本。</b>通过项目仓库中的 <code>mengbao.user.js</code> 安装，或在管理器中新建脚本并粘贴完整源码。确认版本为 <code>1.8</code>（正式版）。</li>
 <li><b>检查站点白名单。</b>已预置 2 个论坛域名，只在这些域名下介入。若站点不在名单内，可通过管理器菜单添加；不要在不了解结构时把脚本放到所有网站运行。</li>
 <li><b>打开一个支持的版块列表。</b>确认悬浮球出现、看图能生成预览、设置保存后刷新仍保留，再开始使用。</li>
 <li><b>更新前导出配置。</b>覆盖安装同一份脚本通常可保留管理器中的数据，但换浏览器、换设备、清理站点数据或改变存储命名空间前，应先导出。</li>
@@ -121,7 +121,7 @@ details.fold{margin:12px 0;border:1px solid var(--line);border-radius:8px;backgr
 <p class="section-intro">前四项是具体悬浮球能力，后两项是跨模块的全局行为。这样区分后，就不会去错误的页面找球，也不会把全局高亮当成某个球的开关。</p>
 <h3><span class="tag teal">球 · FAB</span> 四个常驻入口</h3>
 <div class="table-wrap"><table><colgroup><col style="width:15%"><col style="width:31%"><col style="width:27%"><col style="width:27%"></colgroup><thead><tr><th>入口</th><th>出现页面</th><th>左键</th><th>右键</th></tr></thead><tbody>
-<tr><td><b>看图球</b></td><td>版块列表、搜索、导读、空间收藏、用户主题</td><td>开启 / 停止持续看图；收起后用于展开预览</td><td>停止并收起预览，缓存保留</td></tr>
+<tr><td><b>看图球</b></td><td>版块列表、搜索、导读、空间收藏、用户主题、排行榜</td><td>开启 / 停止持续看图；收起后用于展开预览</td><td>停止并收起预览，缓存保留</td></tr>
 <tr><td><b>翻页球</b></td><td>列表、搜索、导读、小黑屋、空间收藏、用户主题、用户回复</td><td>追加下一页</td><td>开启 / 停止持续翻页</td></tr>
 <tr><td><b>增强球</b></td><td>帖子详情页</td><td>画廊、收藏、评分及条件按钮</td><td>打开 / 关闭评论面板</td></tr>
 <tr><td><b>过滤球</b></td><td>搜索、导读</td><td>板块过滤</td><td>标题屏蔽词</td></tr>
@@ -130,7 +130,8 @@ details.fold{margin:12px 0;border:1px solid var(--line);border-radius:8px;backgr
 <div class="table-wrap"><table><colgroup><col style="width:22%"><col style="width:39%"><col style="width:39%"></colgroup><thead><tr><th>全局能力</th><th>主要作用范围</th><th>由什么控制</th></tr></thead><tbody>
 <tr><td><b>已读与收藏高亮</b></td><td>版块列表、搜索结果、用户主题等能识别帖子与作者的行</td><td>已读模式与底色、收藏高亮两色；收藏视觉优先</td></tr>
 <tr><td><b>外观与用户名跳转</b></td><td>版心宽度（全站），以及列表、楼层、评论中的用户名</td><td>宽版模式、画廊配色、右键跳转目标</td></tr>
-<tr><td><b>热度与已购</b></td><td>「我的帖子」与个人主题页的帖子行内，以及帖子详情页标题行的火焰图标后</td><td>通用设置「帖子热度与已购」开关；显示门槛与售卖帖判定见设置与边界一节</td></tr>
+<tr><td><b>热度与已购</b></td><td>「我的帖子」、个人主题页与帖子排行榜的帖子行内，以及帖子详情页标题行的火焰图标后</td><td>通用设置「帖子热度与已购」开关；显示门槛与售卖帖判定见设置与边界一节</td></tr>
+<tr><td><b>排行榜版块筛选</b></td><td>帖子排行榜页（榜单表格上方）</td><td>左键屏蔽某版块、右键只看某版块；按榜单类型与时段各自记忆，切换分类互不影响</td></tr>
 </tbody></table></div>
 <div class="notice tip"><p class="notice-title">所有球都可拖动，吸附规则不完全相同</p><p>移动超过 3px 才视为拖拽，位置与折叠状态按账号保存。竖线吸附阈值为 10px：看图、翻页可主动对齐，过滤只作为对齐目标，增强不参与；吸附只调整横向位置。位置乱了可在设置中点“重置位置”。</p></div>
 </section>
@@ -145,7 +146,7 @@ details.fold{margin:12px 0;border:1px solid var(--line);border-radius:8px;backgr
 <tr><td>用户回复</td><td>—</td><td>支持</td><td>—</td><td>—</td><td>生效</td><td>保留回复引用行，不按主题页处理</td></tr>
 <tr><td>小黑屋</td><td>—</td><td>支持</td><td>—</td><td>—</td><td>生效</td><td>只接管翻页</td></tr>
 <tr><td>帖子详情</td><td>点图画廊</td><td>论坛原分页 / 评论面板</td><td>—</td><td>支持</td><td>支持</td><td>增强球、收藏、评分、评论</td></tr>
-<tr><td>排行榜</td><td>—</td><td>—</td><td>—</td><td>—</td><td>生效</td><td>不主动介入；版心仍按宽版设置</td></tr>
+<tr><td>排行榜</td><td>支持</td><td>—</td><td>—</td><td>—</td><td>支持</td><td>榜单上方带版块筛选条；行内显示热度与已购</td></tr>
 <tr><td>首页、个人中心、勋章等</td><td>—</td><td>—</td><td>—</td><td>—</td><td>生效</td><td>不主动介入；版心仍按宽版设置</td></tr>
 </tbody></table></div>
 <p class="table-hint">宽版只改版心变量与一个 <code>html</code> class，全站生效；论坛切到全屏自适应档时自动放开，不覆盖。</p>
@@ -168,6 +169,17 @@ details.fold{margin:12px 0;border:1px solid var(--line);border-radius:8px;backgr
 <tr><td><code>!置顶</code></td><td>排除规则，命中后不隐藏</td><td>优先于隐藏规则，用于抵消误杀</td></tr>
 </tbody></table></div>
 <p>带板块 ID 的页面可选择“仅过滤当前板块”；否则规则全局生效。保存立即重排，取消不写入。</p>
+<h3>排行榜版块筛选：榜单上方的一条筛选</h3>
+<div class="table-wrap"><table><colgroup><col style="width:22%"><col style="width:39%"><col style="width:39%"></colgroup><thead><tr><th>操作</th><th>效果</th><th>说明</th></tr></thead><tbody>
+<tr><td><b>左键版块条目</b></td><td>该版块变灰并划线，榜单里属于它的帖子收起</td><td>再左键一次取消屏蔽；屏蔽可多个叠加</td></tr>
+<tr><td><b>右键版块条目</b></td><td>该版块点亮蓝底，其余全部收起</td><td>可同时只看多个；再右键同一个即退回全部</td></tr>
+<tr><td><b>左键「全部」</b></td><td>清空当前筛选，恢复整张榜单</td><td>序号始终是它在总榜里的真实名次，不重排</td></tr>
+</tbody></table></div>
+<ul>
+<li>五种榜单（回复 / 查看 / 分享 / 收藏 / 热度）与四个时段（今日 / 本周 / 本月 / 全部）各记一套选择；切换分类后互不影响，切回来仍在。</li>
+<li>被筛掉的帖子，其标题下的图片预览块会一起收起，不会留下无主的图。</li>
+<li>这条筛选只在帖子排行榜页出现，不是悬浮球，也不能拖动。</li>
+</ul>
 </section>
 <section id="g05" class="doc-section"><div class="section-head"><span class="section-no">05</span><h2>看图与画廊</h2></div>
 <h3>列表预览带</h3>
@@ -175,7 +187,7 @@ details.fold{margin:12px 0;border:1px solid var(--line);border-radius:8px;backgr
 <li>每帖默认先显示 <b>3 张</b>，可设 <b>1–12 张</b>；更多图片通过末尾“+”进入画廊。</li>
 <li>缩略图高度默认 <b>200px</b>，可设 <b>120–320px</b>；尚未展开时，执行代码使用的起点高度是 <b>120px</b>。</li>
 <li>滚动前会提前取图；抓页请求走同一个全局请求池（并发 4、间隔 80ms、同地址 60 秒内复用），当前帖优先于翻页与热度。</li>
-<li><b>持久化缓存上限 4000 帖</b>；页面上已渲染的预览块上限 3200 个；超出后淘汰最旧的，滚回去不用重新请求帖子。预览缓存只是提速，不是长期备份。</li>
+<li><b>持久化缓存上限 500 帖</b>：按浏览顺序淘汰最旧的，被淘汰的帖子滚回去要重新请求；写入前还有一道体积闸门，序列化超过约 200 万字符或本地配额不足时，先砍到最旧的 250 帖再写。预览缓存只是提速，不是长期备份。</li>
 </ul>
 <h3>异常图如何处理</h3>
 <div class="table-wrap"><table><colgroup><col style="width:25%"><col style="width:39%"><col style="width:36%"></colgroup><thead><tr><th>情况</th><th>脚本处理</th><th>用户看到什么</th></tr></thead><tbody>
@@ -190,6 +202,8 @@ details.fold{margin:12px 0;border:1px solid var(--line);border-radius:8px;backgr
 <li>滚轮切换图片，<kbd>Ctrl</kbd> + 滚轮缩放；缩放范围 <b>0.3×–5×</b>，放大后可拖动平移。</li>
 <li>支持顺时针 90° 旋转、底部缩略条定位；<kbd>Esc</kbd> 关闭画廊，双击图片或点击规定的空白 / 顶栏区域退出单图。</li>
 <li>图片加载超过 <b>3 秒</b>才显示慢加载提示，避免正常图片也频繁闪状态。</li>
+<li>页面正文里已经加载完成的同一张图会被直接拿来用，不再重复请求——翻到看过的图几乎即时显示。</li>
+<li>论坛自己的缺图占位（<code>MISSING_</code> 主机、<code>none.gif</code>）在采集阶段就被挡掉，不会变成一张灰色空图或占掉一个预览位置。</li>
 </ul>
 </section>
 <section id="g06" class="doc-section"><div class="section-head"><span class="section-no">06</span><h2>帖子详情、评分与评论</h2></div>
@@ -224,11 +238,11 @@ details.fold{margin:12px 0;border:1px solid var(--line);border-radius:8px;backgr
 </ul>
 </section>
 <section id="g08" class="doc-section"><div class="section-head"><span class="section-no">08</span><h2>设置项：默认值与生效时机</h2></div>
-<p class="section-intro">入口：油猴管理器菜单 →“设置（v1.7）”。设置弹窗分为通用 7 项、看图 6 项，以及收藏馆入口。</p>
+<p class="section-intro">入口：油猴管理器菜单 →“设置（v1.8）”。设置弹窗分为通用 7 项、看图 6 项、收藏馆入口，底部再排六个工具按钮：头像设置、重置位置、清除缓存、导出配置、导入配置、恢复默认。</p>
 <h3>通用设置（7 项）</h3>
 <div class="table-wrap"><table><colgroup><col style="width:22%"><col style="width:24%"><col style="width:31%"><col style="width:23%"></colgroup><thead><tr><th>设置</th><th>默认 / 范围</th><th>作用</th><th>生效时机</th></tr></thead><tbody>
 <tr><td>宽版模式</td><td>默认勾选（1200）</td><td>勾选 = 版心 1200，还原论坛旧版宽度，全站生效；不勾选 = 跟随论坛当前的 960 窄档</td><td>立即；建议刷新重排</td></tr>
-<tr><td>已读帖子</td><td>加底色 + 划线</td><td>关闭 / 加底色 + 划线 / 只加底色；关闭也停止新记录；记录上限 3200 条</td><td>立即</td></tr>
+<tr><td>已读帖子</td><td>加底色 + 划线</td><td>关闭 / 加底色 + 划线 / 只加底色；关闭也停止新记录；记录上限 500 条</td><td>立即</td></tr>
 <tr><td>已读帖子底色</td><td><code>#f0f0f0</code></td><td>未收藏的已读帖整行底色；与收藏高亮同时命中时以收藏高亮优先</td><td>立即</td></tr>
 <tr><td>帖子热度与已购</td><td>默认开启</td><td>在「我的帖子」与个人主题页的标题右侧显示热度与购买人数，进详情页时标题行火焰后也直接出数；未达门槛的帖子不显示，购买数只有标价出售的帖子才有；关闭后不逐帖请求、也不显示</td><td>立即</td></tr>
 <tr><td>按发帖时间排序</td><td>默认开启</td><td>通过 URL 参数按发帖时间倒序</td><td>刷新后</td></tr>
@@ -271,7 +285,9 @@ details.fold{margin:12px 0;border:1px solid var(--line);border-radius:8px;backgr
 <li>详情页若返回明显异常的总页数，目前只有按回复数重算的兜底，原始异常根因仍需真实现场。</li>
 <li>图床连接重置或 HTTP/2 协议错误可能自动恢复，所以首次全挂不等于图片永久失效。</li>
 <li>翻页追加、窗口重新聚焦、标签页重新可见及 <code>pageshow</code> 恢复时，都会尝试补标已读。</li>
+<li>排行榜一次可能列出上百条，热度先取视口上下各一屏，首屏出数后再分批补剩余，不会让首屏排在上百个请求后面。</li>
 <li>热度与已购进页时逐帖取一次，一页约几秒；热度不到显示门槛的帖子不显示，购买数只有标价出售的帖子才有；后台有短时间软缓存，不会每次进页都重复请求。详情页取不到时会重试一次；旧记录缺的字段会被新值补齐。已判「已购 0」的售卖帖停留本页不会自动刷新数字，需刷新页面、翻页或重进后才重新抓取。详情页标题行的标签与列表同源，进帖即出数，不再额外发请求。</li>
+<li>排行榜的版块筛选跟着分类走：同一分类刷新后保留，换到别的榜单或时段则从整张榜单开始；每个分类的选择都独立存着，切回来即恢复。</li>
 
 </ul>
 </section>
@@ -301,7 +317,7 @@ details.fold{margin:12px 0;border:1px solid var(--line);border-radius:8px;backgr
 <li><a href="#g10">现状与边界</a></li>
 <li><a href="#g11">常见问题</a></li></ul></nav></aside>
 </div>
-<footer class="footer"><p>萌宝小秘书 · 独立自包含文档 · CSS 与交互脚本均内嵌，无外部资源。</p><p>正式版 v1.7 · 7,609 行 / 471,709 B · MD5: 37c0b133a023e5186741254c95065f7f</p></footer>
+<footer class="footer"><p>萌宝小秘书 · 独立自包含文档 · CSS 与交互脚本均内嵌，无外部资源。</p><p>正式版 v1.8 · 8,132 行 / 498,447 B · MD5: e9e9de14b6c16506a72c68554fab1d67</p></footer>
 </div>
 <button id="backTop" class="backtop" type="button" aria-label="返回顶部" title="返回顶部">↑</button>
 <script>
